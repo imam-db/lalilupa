@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaliLink - Credential Management</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6B7280',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        error: '#EF4444'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+        .modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .modal:not(.hidden) {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .btn-primary {
+            background-color: #3B82F6;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-color: #2563EB;
+        }
+        .btn-secondary {
+            background-color: #6B7280;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-secondary:hover {
+            background-color: #4B5563;
+        }
+        .btn-danger {
+            background-color: #EF4444;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-danger:hover {
+            background-color: #DC2626;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center space-x-3">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <span class="loading-text">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-40 space-y-2"></div>
+
+    <!-- Auth Container (Login/Register) -->
+    <div id="authContainer" class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm border border-gray-200">
+            <div class="text-center mb-6">
+                <div class="mx-auto h-12 w-12 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center mb-4">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900 mb-2">LaliLink</h1>
+                <p class="text-gray-600 text-sm">Client-Based Credential Management</p>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="loginFormContainer">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6 text-center">Welcome Back</h2>
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                        <input type="email" id="loginEmail" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors bg-white text-gray-900"
+                               placeholder="Enter your email">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="loginPassword" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors bg-white text-gray-900"
+                               placeholder="Enter your password">
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium py-2.5 px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 mt-6">
+                        Sign In
+                    </button>
+                </form>
+                
+                <!-- Additional Login Options -->
+                <div class="mt-6 text-center">
+                    <p class="text-xs text-gray-500">Secure credential management for your business</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="appContainer" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-2xl font-bold text-gray-900">LaliLink</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span id="userEmail" class="text-sm text-gray-600"></span>
+                        <span id="userRoleBadge" class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800"></span>
+                        <button id="logoutBtn" class="btn-secondary text-sm">
+                            <i class="fas fa-sign-out-alt mr-1"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <!-- Breadcrumb -->
+            <nav id="breadcrumbNav" class="mb-6">
+                <ol class="flex items-center space-x-2 text-sm text-gray-500">
+                    <li><a href="#" class="hover:text-primary">Clients</a></li>
+                </ol>
+            </nav>
+
+            <!-- Navigation Tabs -->
+            <div class="mb-6">
+                <nav class="flex space-x-8">
+                    <button data-tab="clients" class="tab-button border-b-2 border-primary text-primary pb-2 font-medium">
+                        Clients
+                    </button>
+                    <button data-tab="users" data-admin-only
+                            class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 pb-2 font-medium hidden">
+                        User Management
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Main Content -->
+            <main>
+                <!-- Clients View -->
+                <div id="clientsContent">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-900">Client List</h2>
+                        <button id="addClientBtn" class="btn-primary">
+                            <i class="fas fa-plus mr-2"></i>Add Client
+                        </button>
+                    </div>
+                    
+                    <!-- Search Bar -->
+                    <div class="mb-6">
+                        <input type="text" id="clientSearch" placeholder="Search clients..." 
+                               class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    
+                    <!-- Clients Grid -->
+                    <div id="clientsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Client cards will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Applications View -->
+                <div id="applicationsContent" class="hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-900">Applications</h2>
+                        <button id="addApplicationBtn" class="btn-primary">
+                            <i class="fas fa-plus mr-2"></i>Add Application
+                        </button>
+                    </div>
+                    
+                    <!-- Search Bar -->
+                    <div class="mb-6">
+                        <input type="text" id="applicationSearch" placeholder="Search applications..." 
+                               class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    
+                    <div id="applicationsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Application cards will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Credentials View -->
+                <div id="credentialsContent" class="hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-900">Credentials</h2>
+                        <button id="addCredentialBtn" class="btn-primary">
+                            <i class="fas fa-plus mr-2"></i>Add Credential
+                        </button>
+                    </div>
+                    
+                    <!-- Search Bar -->
+                    <div class="mb-6">
+                        <input type="text" id="credentialSearch" placeholder="Search credentials..." 
+                               class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    
+                    <div id="credentialsList" class="space-y-4">
+                        <!-- Credential cards will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Users View (Admin Only) -->
+                <div id="usersContent" class="hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-900">User Management</h2>
+                    </div>
+                    
+                    <div class="bg-white shadow rounded-lg overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersList" class="bg-white divide-y divide-gray-200">
+                                <!-- User rows will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Client Modal -->
+    <div id="clientModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold">Add/Edit Client</h3>
+            </div>
+            <form id="clientForm">
+                <div class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Client Name</label>
+                        <input type="text" id="clientName" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+                        <input type="text" id="companyName" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Contact</label>
+                        <textarea id="contactInfo" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                    <button type="button" id="clientCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Modal -->
+    <div id="applicationModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold">Add/Edit Application</h3>
+            </div>
+            <form id="applicationForm">
+                <div class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Application Name</label>
+                        <input type="text" id="applicationName" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Application Type</label>
+                        <input type="text" id="applicationType" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">URL</label>
+                        <input type="url" id="applicationUrl" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="applicationDescription" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                    <button type="button" id="applicationCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Credential Modal -->
+    <div id="credentialModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold">Add/Edit Credential</h3>
+            </div>
+            <form id="credentialForm">
+                <div class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Credential Name</label>
+                        <input type="text" id="credentialName" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                        <input type="text" id="credentialUsername" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <input type="password" id="credentialPassword" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        <textarea id="credentialNotes" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                    <button type="button" id="credentialCancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Role Modal (Admin Only) -->
+    <div id="roleModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold">Change User Role</h3>
+            </div>
+            <div class="px-6 py-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select id="roleSelect" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="viewer">Viewer</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                <button type="button" id="roleCancelBtn" class="btn-secondary">Cancel</button>
+                <button id="roleSaveBtn" class="btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold">Confirmation</h3>
+            </div>
+            <div class="px-6 py-4">
+                <p id="confirmMessage" class="text-gray-700"></p>
+            </div>
+            <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                <button type="button" id="confirmCancelBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmActionBtn" class="btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="config.js"></script>
+    <script src="assets/js/security.js"></script>
+    <script src="assets/js/clipboard.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/database.js"></script>
+    <script src="assets/js/ui.js"></script>
+    <script src="assets/js/main.js"></script>
+    
+    <script>
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                window.app = new LaliLinkApp();
+                await window.app.init();
+            } catch (error) {
+                console.error('Failed to initialize app:', error);
+                alert('Failed to initialize application. Please refresh the page.');
+            }
+        });
+    </script>
+</body>
+</html>

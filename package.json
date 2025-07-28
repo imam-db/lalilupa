@@ -1,0 +1,25 @@
+{
+  "name": "lalilink",
+  "version": "1.0.0",
+  "description": "LaliLink - Aplikasi manajemen kredensial berbasis klien dengan Role-Based Access Control",
+  "main": "index.html",
+  "scripts": {
+    "dev": "live-server --port=8080 --open=/index.html",
+    "start": "http-server -p 8080 -o",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "credential-management",
+    "password-manager",
+    "client-management",
+    "supabase",
+    "rbac"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2",
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {}
+}
