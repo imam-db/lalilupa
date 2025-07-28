@@ -116,12 +116,15 @@ class LaliLinkApp {
      */
     setupUIEventHandlers() {
         // Override UI callback methods
-        this.ui.onTabSwitch = (tabName) => this.handleTabSwitch(tabName);
+        this.ui.onShowClients = () => this.loadClients();
         this.ui.onNavigateToApplications = (client) => this.loadApplications(client);
         this.ui.onNavigateToCredentials = (application) => this.loadCredentials(application);
         this.ui.onClientSearch = (query) => this.searchClients(query);
         this.ui.onApplicationSearch = (query) => this.searchApplications(query);
         this.ui.onCredentialSearch = (query) => this.searchCredentials(query);
+        
+        // Initialize dark theme
+        this.ui.initializeDarkTheme();
         
         // Form submissions
         this.setupFormHandlers();
@@ -419,11 +422,6 @@ class LaliLinkApp {
         try {
             // Load clients by default
             await this.loadClients();
-            
-            // Load users if admin
-            if (this.auth.isAdmin(this.userProfile.role)) {
-                await this.loadUsers();
-            }
         } catch (error) {
             console.error('Failed to load initial data:', error);
             this.ui.showToast('Failed to load data', 'error');
@@ -462,24 +460,19 @@ class LaliLinkApp {
     // ==================== TAB SWITCHING ====================
 
     /**
-     * Handle tab switching
-     * @param {string} tabName - Tab name
+     * Update statistics display
      */
-    async handleTabSwitch(tabName) {
+    async updateStats() {
         try {
-            switch (tabName) {
-                case 'clients':
-                    await this.loadClients();
-                    break;
-                case 'users':
-                    if (this.auth.canPerform(this.userProfile.role, 'users', 'read')) {
-                        await this.loadUsers();
-                    }
-                    break;
-            }
+            const stats = {
+                clients: this.clients.length,
+                applications: this.applications.length,
+                credentials: this.credentials.length
+            };
+            
+            this.ui.updateStats(stats);
         } catch (error) {
-            console.error('Failed to load tab data:', error);
-            this.ui.showToast('Failed to load data', 'error');
+            console.error('Error updating stats:', error);
         }
     }
 
@@ -500,6 +493,7 @@ class LaliLinkApp {
             
             const permissions = this.userPermissions.clients;
             this.ui.renderClients(clients || [], permissions);
+            await this.updateStats();
             
         } catch (error) {
             console.error('Failed to load clients:', error);
@@ -525,6 +519,7 @@ class LaliLinkApp {
             
             const permissions = this.userPermissions.applications;
             this.ui.renderApplications(applications || [], permissions);
+            await this.updateStats();
             
         } catch (error) {
             console.error('Failed to load applications:', error);
@@ -550,6 +545,7 @@ class LaliLinkApp {
             
             const permissions = this.userPermissions.credentials;
             this.ui.renderCredentials(credentials || [], permissions);
+            await this.updateStats();
             
         } catch (error) {
             console.error('Failed to load credentials:', error);
@@ -559,33 +555,7 @@ class LaliLinkApp {
         }
     }
 
-    /**
-     * Load users (Admin only)
-     */
-    async loadUsers() {
-        try {
-            if (!this.auth.canPerform(this.userProfile.role, 'users', 'read')) {
-                return;
-            }
-            
-            this.ui.showLoading('Loading users...');
-            
-            const { data: users, error } = await this.database.getAllUsers();
-            
-            if (error) {
-                throw error;
-            }
-            
-            const permissions = this.userPermissions.users;
-            this.ui.renderUsers(users || [], permissions);
-            
-        } catch (error) {
-            console.error('Failed to load users:', error);
-            this.ui.showToast('Failed to load users', 'error');
-        } finally {
-            this.ui.hideLoading();
-        }
-    }
+
 
     // ==================== SEARCH FUNCTIONALITY ====================
 
@@ -785,7 +755,7 @@ class LaliLinkApp {
         const clientData = {
             client_name: form.querySelector('#clientName').value,
             company_name: form.querySelector('#companyName').value,
-            contact_info: form.querySelector('#contactInfo').value
+            notes: form.querySelector('#clientNotes').value
         };
         
         const mode = e.target.dataset.mode;
@@ -977,7 +947,7 @@ class LaliLinkApp {
             if (this.ui.clientForm) {
                 this.ui.clientForm.querySelector('#clientName').value = client.client_name || '';
                 this.ui.clientForm.querySelector('#companyName').value = client.company_name || '';
-                this.ui.clientForm.querySelector('#contactInfo').value = client.contact_info || '';
+                this.ui.clientForm.querySelector('#clientNotes').value = client.notes || '';
                 
                 this.ui.clientForm.dataset.mode = 'edit';
                 this.ui.clientForm.dataset.clientId = clientId;

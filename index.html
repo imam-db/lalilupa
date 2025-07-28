@@ -17,6 +17,7 @@
     <!-- Custom Tailwind Config -->
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -81,7 +82,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-6 rounded-lg shadow-lg">
@@ -140,15 +141,19 @@
     <!-- Main App Container -->
     <div id="appContainer" class="hidden">
         <!-- Header -->
-        <header class="bg-white shadow-sm border-b">
+        <header class="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-16">
                     <div class="flex items-center">
-                        <h1 class="text-2xl font-bold text-gray-900">LaliLink</h1>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">LaliLink</h1>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span id="userEmail" class="text-sm text-gray-600"></span>
-                        <span id="userRoleBadge" class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800"></span>
+                        <button id="themeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                            <i class="fas fa-moon dark:hidden"></i>
+                            <i class="fas fa-sun hidden dark:inline"></i>
+                        </button>
+                        <span id="userEmail" class="text-sm text-gray-600 dark:text-gray-300"></span>
+                        <span id="userRoleBadge" class="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"></span>
                         <button id="logoutBtn" class="btn-secondary text-sm">
                             <i class="fas fa-sign-out-alt mr-1"></i> Logout
                         </button>
@@ -160,39 +165,80 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <!-- Breadcrumb -->
             <nav id="breadcrumbNav" class="mb-6">
-                <ol class="flex items-center space-x-2 text-sm text-gray-500">
+                <ol class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                     <li><a href="#" class="hover:text-primary">Clients</a></li>
                 </ol>
             </nav>
 
-            <!-- Navigation Tabs -->
-            <div class="mb-6">
-                <nav class="flex space-x-8">
-                    <button data-tab="clients" class="tab-button border-b-2 border-primary text-primary pb-2 font-medium">
-                        Clients
+            <!-- Header Section -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                            <i class="fas fa-users text-blue-600 dark:text-blue-400 text-xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Client Manager</h1>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">Manage your client credentials</p>
+                        </div>
+                    </div>
+                    <button id="addClientBtn" class="btn-primary flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                        <i class="fas fa-plus"></i>
+                        <span>Add Client</span>
                     </button>
-                    <button data-tab="users" data-admin-only
-                            class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 pb-2 font-medium hidden">
-                        User Management
-                    </button>
-                </nav>
+                </div>
             </div>
 
             <!-- Main Content -->
             <main>
                 <!-- Clients View -->
                 <div id="clientsContent">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-semibold text-gray-900">Client List</h2>
-                        <button id="addClientBtn" class="btn-primary">
-                            <i class="fas fa-plus mr-2"></i>Add Client
-                        </button>
-                    </div>
-                    
                     <!-- Search Bar -->
                     <div class="mb-6">
-                        <input type="text" id="clientSearch" placeholder="Search clients..." 
-                               class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        <div class="relative max-w-md">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-search text-gray-400 dark:text-gray-500"></i>
+                            </div>
+                            <input type="text" id="clientSearch" placeholder="Search client name, company, applications, or credentials..." 
+                                   class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400">
+                        </div>
+                    </div>
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg mr-4">
+                                    <i class="fas fa-users text-blue-600 dark:text-blue-400 text-lg"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Total Clients</p>
+                                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="totalClients">3</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg mr-4">
+                                    <i class="fas fa-mobile-alt text-green-600 dark:text-green-400 text-lg"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Applications</p>
+                                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="totalApplications">5</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center">
+                                <div class="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg mr-4">
+                                    <i class="fas fa-key text-yellow-600 dark:text-yellow-400 text-lg"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Credentials</p>
+                                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="totalCredentials">5</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Clients Grid -->
@@ -204,7 +250,7 @@
                 <!-- Applications View -->
                 <div id="applicationsContent" class="hidden">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-semibold text-gray-900">Applications</h2>
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Applications</h2>
                         <button id="addApplicationBtn" class="btn-primary">
                             <i class="fas fa-plus mr-2"></i>Add Application
                         </button>
@@ -213,7 +259,7 @@
                     <!-- Search Bar -->
                     <div class="mb-6">
                         <input type="text" id="applicationSearch" placeholder="Search applications..." 
-                               class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full max-w-md px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400">
                     </div>
                     
                     <div id="applicationsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -224,7 +270,7 @@
                 <!-- Credentials View -->
                 <div id="credentialsContent" class="hidden">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-semibold text-gray-900">Credentials</h2>
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Credentials</h2>
                         <button id="addCredentialBtn" class="btn-primary">
                             <i class="fas fa-plus mr-2"></i>Add Credential
                         </button>
@@ -233,7 +279,7 @@
                     <!-- Search Bar -->
                     <div class="mb-6">
                         <input type="text" id="credentialSearch" placeholder="Search credentials..." 
-                               class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full max-w-md px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400">
                     </div>
                     
                     <div id="credentialsList" class="space-y-4">
@@ -241,28 +287,7 @@
                     </div>
                 </div>
 
-                <!-- Users View (Admin Only) -->
-                <div id="usersContent" class="hidden">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-semibold text-gray-900">User Management</h2>
-                    </div>
-                    
-                    <div class="bg-white shadow rounded-lg overflow-hidden">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usersList" class="bg-white divide-y divide-gray-200">
-                                <!-- User rows will be rendered here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+
             </main>
         </div>
     </div>
@@ -270,29 +295,29 @@
     <!-- Modals -->
     <!-- Client Modal -->
     <div id="clientModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
-            <div class="px-6 py-4 border-b">
-                <h3 class="text-lg font-semibold">Add/Edit Client</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add/Edit Client</h3>
             </div>
             <form id="clientForm">
                 <div class="px-6 py-4 space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Client Name</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Client Name</label>
                         <input type="text" id="clientName" required 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Company Name</label>
                         <input type="text" id="companyName" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Contact</label>
-                        <textarea id="contactInfo" rows="3" 
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>
+                        <textarea id="clientNotes" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
                     </div>
                 </div>
-                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                <div class="px-6 py-4 border-t dark:border-gray-700 flex justify-end space-x-3">
                     <button type="button" id="clientCancelBtn" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save</button>
                 </div>
@@ -302,34 +327,34 @@
 
     <!-- Application Modal -->
     <div id="applicationModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
-            <div class="px-6 py-4 border-b">
-                <h3 class="text-lg font-semibold">Add/Edit Application</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add/Edit Application</h3>
             </div>
             <form id="applicationForm">
                 <div class="px-6 py-4 space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Application Name</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Application Name</label>
                         <input type="text" id="applicationName" required 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Application Type</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Application Type</label>
                         <input type="text" id="applicationType" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">URL</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL</label>
                         <input type="url" id="applicationUrl" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
                         <textarea id="applicationDescription" rows="3" 
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
                     </div>
                 </div>
-                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                <div class="px-6 py-4 border-t dark:border-gray-700 flex justify-end space-x-3">
                     <button type="button" id="applicationCancelBtn" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save</button>
                 </div>
@@ -339,34 +364,34 @@
 
     <!-- Credential Modal -->
     <div id="credentialModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 hidden">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
-            <div class="px-6 py-4 border-b">
-                <h3 class="text-lg font-semibold">Add/Edit Credential</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add/Edit Credential</h3>
             </div>
             <form id="credentialForm">
                 <div class="px-6 py-4 space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Credential Name</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Credential Name</label>
                         <input type="text" id="credentialName" required 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
                         <input type="text" id="credentialUsername" required 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
                         <input type="password" id="credentialPassword" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>
                         <textarea id="credentialNotes" rows="3" 
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
                     </div>
                 </div>
-                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                <div class="px-6 py-4 border-t dark:border-gray-700 flex justify-end space-x-3">
                     <button type="button" id="credentialCancelBtn" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save</button>
                 </div>

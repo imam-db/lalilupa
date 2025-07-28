@@ -20,9 +20,7 @@ CREATE TABLE IF NOT EXISTS clients (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     client_name TEXT NOT NULL,
     company_name TEXT,
-    email TEXT,
-    phone TEXT,
-    address TEXT,
+    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

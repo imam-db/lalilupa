@@ -36,13 +36,16 @@ class UIManager {
         this.clientsContent = document.getElementById('clientsContent');
         this.applicationsContent = document.getElementById('applicationsContent');
         this.credentialsContent = document.getElementById('credentialsContent');
-        this.usersContent = document.getElementById('usersContent');
         
         // Lists
         this.clientsList = document.getElementById('clientsList');
         this.applicationsList = document.getElementById('applicationsList');
         this.credentialsList = document.getElementById('credentialsList');
-        this.usersList = document.getElementById('usersList');
+        
+        // Stats elements
+        this.totalClientsEl = document.getElementById('totalClients');
+        this.totalApplicationsEl = document.getElementById('totalApplications');
+        this.totalCredentialsEl = document.getElementById('totalCredentials');
         
         // Modals
         this.clientModal = document.getElementById('clientModal');
@@ -207,45 +210,22 @@ class UIManager {
     // ==================== NAVIGATION & TABS ====================
 
     /**
-     * Switch between tabs
-     * @param {string} tabName - Tab name
+     * Show clients view (default view)
      */
-    switchTab(tabName) {
-        // Update active tab
-        this.navTabs.forEach(tab => {
-            if (tab.getAttribute('data-tab') === tabName) {
-                tab.classList.add('border-primary-500', 'text-primary-600');
-                tab.classList.remove('border-transparent', 'text-gray-500');
-            } else {
-                tab.classList.remove('border-primary-500', 'text-primary-600');
-                tab.classList.add('border-transparent', 'text-gray-500');
-            }
-        });
-
-        // Show/hide content
-        const contents = [this.clientsContent, this.applicationsContent, this.credentialsContent, this.usersContent];
-        contents.forEach(content => {
-            if (content) {
-                content.classList.add('hidden');
-            }
-        });
-
-        // Show selected content
-        switch (tabName) {
-            case 'clients':
-                this.currentView = 'clients';
-                if (this.clientsContent) this.clientsContent.classList.remove('hidden');
-                this.updateBreadcrumb([{ text: 'Clients', action: null }]);
-                break;
-            case 'users':
-                this.currentView = 'users';
-                if (this.usersContent) this.usersContent.classList.remove('hidden');
-                this.updateBreadcrumb([{ text: 'User Management', action: null }]);
-                break;
-        }
-
+    showClientsView() {
+        this.currentView = 'clients';
+        
+        // Hide other contents
+        if (this.applicationsContent) this.applicationsContent.classList.add('hidden');
+        if (this.credentialsContent) this.credentialsContent.classList.add('hidden');
+        
+        // Show clients content
+        if (this.clientsContent) this.clientsContent.classList.remove('hidden');
+        
+        this.updateBreadcrumb([{ text: 'Clients', action: null }]);
+        
         // Trigger content load
-        this.onTabSwitch(tabName);
+        if (this.onShowClients) this.onShowClients();
     }
 
     /**
@@ -259,14 +239,13 @@ class UIManager {
         // Hide other contents
         if (this.clientsContent) this.clientsContent.classList.add('hidden');
         if (this.credentialsContent) this.credentialsContent.classList.add('hidden');
-        if (this.usersContent) this.usersContent.classList.add('hidden');
         
         // Show applications content
         if (this.applicationsContent) this.applicationsContent.classList.remove('hidden');
         
         // Update breadcrumb
         this.updateBreadcrumb([
-            { text: 'Clients', action: () => this.switchTab('clients') },
+            { text: 'Clients', action: () => this.showClientsView() },
             { text: client.client_name, action: null }
         ]);
         
@@ -291,14 +270,13 @@ class UIManager {
         // Hide other contents
         if (this.clientsContent) this.clientsContent.classList.add('hidden');
         if (this.applicationsContent) this.applicationsContent.classList.add('hidden');
-        if (this.usersContent) this.usersContent.classList.add('hidden');
         
         // Show credentials content
         if (this.credentialsContent) this.credentialsContent.classList.remove('hidden');
         
         // Update breadcrumb
         this.updateBreadcrumb([
-            { text: 'Clients', action: () => this.switchTab('clients') },
+            { text: 'Clients', action: () => this.showClientsView() },
             { text: this.currentClient?.client_name || 'Client', action: () => this.navigateToApplications(this.currentClient) },
             { text: application.app_name, action: null }
         ]);
@@ -524,31 +502,30 @@ class UIManager {
         }
         
         this.clientsList.innerHTML = clients.map(client => `
-            <div class="client-card bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" 
-                 onclick="window.laliApp.ui.navigateToApplications(${JSON.stringify(client).replace(/"/g, '&quot;')})">
+            <div class="client-card bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700" 
+                 onclick="window.laliApp.ui.navigateToApplications(${JSON.stringify(client).replace(/"/g, '&quot;')}); window.laliApp.ui.showToast('Loading applications for ${client.client_name}...', 'info', 2000);">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-900">${this.escapeHtml(client.client_name)}</h3>
-                        <p class="text-gray-600">${this.escapeHtml(client.company_name || '')}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(client.client_name)}</h3>
+                        <p class="text-gray-600 dark:text-gray-300">${this.escapeHtml(client.company_name || '')}</p>
                     </div>
-                    <div class="flex space-x-2">
+                    <div class="flex space-x-3">
                         ${permissions.canUpdate ? `
-                            <button onclick="event.stopPropagation(); window.laliApp.editClient(${client.id})" 
-                                    class="text-blue-600 hover:text-blue-800">
-                                <i class="fas fa-edit"></i>
+                            <button onclick="event.stopPropagation(); window.laliApp.editClient(${client.id}); window.laliApp.ui.showToast('Opening client editor...', 'info', 2000);" 
+                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit Client">
+                                <i class="fas fa-edit text-lg"></i>
                             </button>
                         ` : ''}
                         ${permissions.canDelete ? `
-                            <button onclick="event.stopPropagation(); window.laliApp.deleteClient(${client.id})" 
-                                    class="text-red-600 hover:text-red-800">
-                                <i class="fas fa-trash"></i>
+                            <button onclick="event.stopPropagation(); if(confirm('Are you sure you want to delete this client?')) { window.laliApp.deleteClient(${client.id}); window.laliApp.ui.showToast('Client deleted successfully', 'success'); }" 
+                                    class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Client">
+                                <i class="fas fa-trash text-lg"></i>
                             </button>
                         ` : ''}
                     </div>
                 </div>
-                <div class="text-sm text-gray-500">
-                    <p><i class="fas fa-envelope mr-2"></i>${this.escapeHtml(client.email || '')}</p>
-                    <p><i class="fas fa-phone mr-2"></i>${this.escapeHtml(client.phone || '')}</p>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    ${client.notes ? `<p><i class="fas fa-sticky-note mr-2"></i>${this.escapeHtml(client.notes)}</p>` : ''}
                     <p><i class="fas fa-calendar mr-2"></i>Created: ${this.formatDate(client.created_at)}</p>
                 </div>
             </div>
@@ -565,7 +542,7 @@ class UIManager {
         
         if (!applications || applications.length === 0) {
             this.applicationsList.innerHTML = `
-                <div class="text-center py-8 text-gray-500">
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
                     <i class="fas fa-desktop text-4xl mb-4"></i>
                     <p>No applications found</p>
                     ${permissions.canCreate ? '<p class="text-sm">Click "Add Application" to get started</p>' : ''}
@@ -575,29 +552,29 @@ class UIManager {
         }
         
         this.applicationsList.innerHTML = applications.map(app => `
-            <div class="application-card bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" 
-                 onclick="window.laliApp.ui.navigateToCredentials(${JSON.stringify(app).replace(/"/g, '&quot;')})">
+            <div class="application-card bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700" 
+                 onclick="window.laliApp.ui.navigateToCredentials(${JSON.stringify(app).replace(/"/g, '&quot;')}); window.laliApp.ui.showToast('Loading credentials for ${app.app_name}...', 'info', 2000);">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-900">${this.escapeHtml(app.app_name)}</h3>
-                        <p class="text-gray-600">${this.escapeHtml(app.app_url || '')}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(app.app_name)}</h3>
+                        <p class="text-gray-600 dark:text-gray-300">${this.escapeHtml(app.app_url || '')}</p>
                     </div>
-                    <div class="flex space-x-2">
+                    <div class="flex space-x-3">
                         ${permissions.canUpdate ? `
-                            <button onclick="event.stopPropagation(); window.laliApp.editApplication(${app.id})" 
-                                    class="text-blue-600 hover:text-blue-800">
-                                <i class="fas fa-edit"></i>
+                            <button onclick="event.stopPropagation(); window.laliApp.editApplication(${app.id}); window.laliApp.ui.showToast('Opening application editor...', 'info', 2000);" 
+                                    class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit Application">
+                                <i class="fas fa-edit text-lg"></i>
                             </button>
                         ` : ''}
                         ${permissions.canDelete ? `
-                            <button onclick="event.stopPropagation(); window.laliApp.deleteApplication(${app.id})" 
-                                    class="text-red-600 hover:text-red-800">
-                                <i class="fas fa-trash"></i>
+                            <button onclick="event.stopPropagation(); if(confirm('Are you sure you want to delete this application?')) { window.laliApp.deleteApplication(${app.id}); window.laliApp.ui.showToast('Application deleted successfully', 'success'); }" 
+                                    class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Application">
+                                <i class="fas fa-trash text-lg"></i>
                             </button>
                         ` : ''}
                     </div>
                 </div>
-                <div class="text-sm text-gray-500">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                     <p><i class="fas fa-info-circle mr-2"></i>${this.escapeHtml(app.description || 'No description')}</p>
                     <p><i class="fas fa-calendar mr-2"></i>Created: ${this.formatDate(app.created_at)}</p>
                 </div>
@@ -615,7 +592,7 @@ class UIManager {
         
         if (!credentials || credentials.length === 0) {
             this.credentialsList.innerHTML = `
-                <div class="text-center py-8 text-gray-500">
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
                     <i class="fas fa-key text-4xl mb-4"></i>
                     <p>No credentials found</p>
                     ${permissions.canCreate ? '<p class="text-sm">Click "Add Credential" to get started</p>' : ''}
@@ -625,42 +602,42 @@ class UIManager {
         }
         
         this.credentialsList.innerHTML = credentials.map(cred => `
-            <div class="credential-card bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div class="credential-card bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700">
                 <div class="flex justify-between items-start mb-4">
                     <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-gray-900">${this.escapeHtml(cred.username)}</h3>
-                        <p class="text-gray-600">${this.escapeHtml(cred.description || '')}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(cred.username)}</h3>
+                        <p class="text-gray-600 dark:text-gray-300">${this.escapeHtml(cred.description || '')}</p>
                     </div>
-                    <div class="flex space-x-2">
-                        <button onclick="window.laliApp.copyUsername('${cred.username}')" 
-                                class="text-blue-600 hover:text-blue-800" title="Copy Username">
-                            <i class="fas fa-user"></i>
+                    <div class="flex space-x-3 flex-wrap gap-2">
+                        <button onclick="window.laliApp.copyUsername('${cred.username}'); window.laliApp.ui.showToast('Username copied to clipboard', 'success', 2000);" 
+                                class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Copy Username">
+                            <i class="fas fa-user text-lg"></i>
                         </button>
-                        <button onclick="window.laliApp.copyPassword(${cred.id})" 
-                                class="text-green-600 hover:text-green-800" title="Copy Password">
-                            <i class="fas fa-key"></i>
+                        <button onclick="window.laliApp.copyPassword(${cred.id}); window.laliApp.ui.showToast('Password copied to clipboard', 'success', 2000);" 
+                                class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-2 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors" title="Copy Password">
+                            <i class="fas fa-key text-lg"></i>
                         </button>
                         ${cred.url ? `
-                            <button onclick="window.laliApp.copyUrl('${cred.url}')" 
-                                    class="text-purple-600 hover:text-purple-800" title="Copy URL">
-                                <i class="fas fa-link"></i>
+                            <button onclick="window.laliApp.copyUrl('${cred.url}'); window.laliApp.ui.showToast('URL copied to clipboard', 'success', 2000);" 
+                                    class="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 p-2 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors" title="Copy URL">
+                                <i class="fas fa-link text-lg"></i>
                             </button>
                         ` : ''}
                         ${permissions.canUpdate ? `
-                            <button onclick="window.laliApp.editCredential(${cred.id})" 
-                                    class="text-blue-600 hover:text-blue-800" title="Edit">
-                                <i class="fas fa-edit"></i>
+                            <button onclick="window.laliApp.editCredential(${cred.id}); window.laliApp.ui.showToast('Opening credential editor...', 'info', 2000);" 
+                                    class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit">
+                                <i class="fas fa-edit text-lg"></i>
                             </button>
                         ` : ''}
                         ${permissions.canDelete ? `
-                            <button onclick="window.laliApp.deleteCredential(${cred.id})" 
-                                    class="text-red-600 hover:text-red-800" title="Delete">
-                                <i class="fas fa-trash"></i>
+                            <button onclick="if(confirm('Are you sure you want to delete this credential?')) { window.laliApp.deleteCredential(${cred.id}); window.laliApp.ui.showToast('Credential deleted successfully', 'success'); }" 
+                                    class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete">
+                                <i class="fas fa-trash text-lg"></i>
                             </button>
                         ` : ''}
                     </div>
                 </div>
-                <div class="text-sm text-gray-500">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                     ${cred.url ? `<p><i class="fas fa-link mr-2"></i>${this.escapeHtml(cred.url)}</p>` : ''}
                     <p><i class="fas fa-calendar mr-2"></i>Created: ${this.formatDate(cred.created_at)}</p>
                     ${cred.updated_at !== cred.created_at ? `<p><i class="fas fa-edit mr-2"></i>Updated: ${this.formatDate(cred.updated_at)}</p>` : ''}
@@ -679,7 +656,7 @@ class UIManager {
         
         if (!users || users.length === 0) {
             this.usersList.innerHTML = `
-                <div class="text-center py-8 text-gray-500">
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
                     <i class="fas fa-users text-4xl mb-4"></i>
                     <p>No users found</p>
                 </div>
@@ -688,29 +665,29 @@ class UIManager {
         }
         
         this.usersList.innerHTML = users.map(user => `
-            <div class="user-card bg-white rounded-lg shadow-md p-6">
+            <div class="user-card bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
                 <div class="flex justify-between items-start mb-4">
                     <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-gray-900">${this.escapeHtml(user.full_name || 'Unknown User')}</h3>
-                        <p class="text-gray-600">${this.escapeHtml(user.email || user.user_id)}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(user.full_name || 'Unknown User')}</h3>
+                        <p class="text-gray-600 dark:text-gray-300">${this.escapeHtml(user.email || user.user_id)}</p>
                         <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${
                             user.role === 'admin' 
-                                ? 'bg-red-100 text-red-800' 
-                                : 'bg-blue-100 text-blue-800'
+                                ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' 
+                                : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                         }">
                             ${user.role?.charAt(0).toUpperCase() + user.role?.slice(1) || 'Unknown'}
                         </span>
                     </div>
-                    <div class="flex space-x-2">
+                    <div class="flex space-x-3">
                         ${permissions.canUpdate ? `
-                            <button onclick="window.laliApp.editUserRole('${user.user_id}', '${user.role}')" 
-                                    class="text-blue-600 hover:text-blue-800" title="Edit Role">
-                                <i class="fas fa-user-cog"></i>
+                            <button onclick="window.laliApp.editUserRole('${user.user_id}', '${user.role}'); window.laliApp.ui.showToast('Opening role editor...', 'info', 2000);" 
+                                    class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit Role">
+                                <i class="fas fa-user-cog text-lg"></i>
                             </button>
                         ` : ''}
                     </div>
                 </div>
-                <div class="text-sm text-gray-500">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                     <p><i class="fas fa-calendar mr-2"></i>Joined: ${this.formatDate(user.created_at)}</p>
                     ${user.updated_at !== user.created_at ? `<p><i class="fas fa-edit mr-2"></i>Updated: ${this.formatDate(user.updated_at)}</p>` : ''}
                 </div>
@@ -758,7 +735,7 @@ class UIManager {
     updateRoleBasedUI(userRole, permissions) {
         // Show/hide add buttons based on permissions
         if (this.addClientBtn) {
-            this.addClientBtn.style.display = permissions.clients?.canCreate ? 'block' : 'none';
+            this.addClientBtn.style.display = permissions.clients?.canCreate ? 'flex' : 'none';
         }
         
         if (this.addApplicationBtn) {
@@ -768,12 +745,112 @@ class UIManager {
         if (this.addCredentialBtn) {
             this.addCredentialBtn.style.display = permissions.credentials?.canCreate ? 'block' : 'none';
         }
-        
-        // Show/hide User Management tab
-        const userTab = document.querySelector('[data-tab="users"]');
-        if (userTab) {
-            userTab.style.display = permissions.users?.canRead ? 'block' : 'none';
+    }
+    
+    /**
+     * Update stats display
+     * @param {Object} stats - Statistics object
+     */
+    updateStats(stats) {
+        if (this.totalClientsEl && stats.clients !== undefined) {
+            this.totalClientsEl.textContent = stats.clients;
         }
+        
+        if (this.totalApplicationsEl && stats.applications !== undefined) {
+            this.totalApplicationsEl.textContent = stats.applications;
+        }
+        
+        if (this.totalCredentialsEl && stats.credentials !== undefined) {
+            this.totalCredentialsEl.textContent = stats.credentials;
+        }
+    }
+
+    /**
+     * Initialize dark theme toggle
+     */
+    initializeDarkTheme() {
+        const themeToggle = document.getElementById('themeToggle');
+        if (!themeToggle) return;
+
+        // Check for saved theme preference or default to light mode
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+            document.documentElement.classList.add('dark');
+        }
+
+        // Toggle theme on button click
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            
+            // Save theme preference
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            
+            // Show toast notification
+            this.showToast(`Switched to ${isDark ? 'dark' : 'light'} theme`, 'success');
+        });
+    }
+
+    /**
+     * Show toast notification
+     * @param {string} message - Toast message
+     * @param {string} type - Toast type (success, error, info, warning)
+     * @param {number} duration - Duration in milliseconds
+     */
+    showToast(message, type = 'info', duration = 3000) {
+        // Remove existing toast if any
+        const existingToast = document.getElementById('toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0`;
+        
+        // Set toast colors based on type
+        const typeClasses = {
+            success: 'bg-green-500 text-white',
+            error: 'bg-red-500 text-white',
+            warning: 'bg-yellow-500 text-black',
+            info: 'bg-blue-500 text-white'
+        };
+        
+        toast.className += ` ${typeClasses[type] || typeClasses.info}`;
+        
+        // Set toast content
+        toast.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <i class="fas ${
+                    type === 'success' ? 'fa-check-circle' :
+                    type === 'error' ? 'fa-exclamation-circle' :
+                    type === 'warning' ? 'fa-exclamation-triangle' :
+                    'fa-info-circle'
+                }"></i>
+                <span>${this.escapeHtml(message)}</span>
+            </div>
+        `;
+        
+        // Add to document
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full', 'opacity-0');
+        }, 10);
+        
+        // Auto remove
+        setTimeout(() => {
+            toast.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 300);
+        }, duration);
     }
 
     // ==================== EVENT CALLBACKS ====================

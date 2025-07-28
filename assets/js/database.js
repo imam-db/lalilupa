@@ -309,7 +309,7 @@ class DatabaseManager {
             const { data, error } = await this.supabase
                 .from('clients')
                 .select('*')
-                .or(`client_name.ilike.%${query}%,company_name.ilike.%${query}%`)
+                .or(`client_name.ilike.%${query}%,company_name.ilike.%${query}%,notes.ilike.%${query}%`)
                 .order('created_at', { ascending: false });
 
             return { data, error };
