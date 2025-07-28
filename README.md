@@ -1,19 +1,19 @@
-# LaliLink - Secure Credential Management System
+# LaliLink - Simple Credential Management System
 
-LaliLink adalah aplikasi web untuk manajemen kredensial yang aman dengan enkripsi AES-256, autentikasi berbasis role, dan antarmuka yang responsif.
+LaliLink is a web application for credential management with role-based authentication and responsive interface.
 
-## 🚀 Fitur Utama
+## 🚀 Key Features
 
-- **Manajemen Klien**: Kelola informasi klien dengan mudah
-- **Manajemen Aplikasi**: Organisir aplikasi berdasarkan klien
-- **Manajemen Kredensial**: Simpan username/password dengan enkripsi AES-256
-- **Role-Based Access Control (RBAC)**: Admin dan Viewer dengan permission berbeda
-- **Keamanan Tinggi**: Enkripsi client-side, Row Level Security (RLS)
-- **UI Responsif**: Desain mobile-first dengan Tailwind CSS
-- **Copy to Clipboard**: Salin kredensial dengan aman
-- **Search & Filter**: Pencarian real-time di semua entitas
+- **Client Management**: Easily manage client information
+- **Application Management**: Organize applications by client
+- **Credential Management**: Store username/password securely
+- **Role-Based Access Control (RBAC)**: Admin and Viewer with different permissions
+- **Security**: Row Level Security (RLS) and secure authentication
+- **Responsive UI**: Mobile-first design with Tailwind CSS
+- **Copy to Clipboard**: Safely copy credentials
+- **Search & Filter**: Real-time search across all entities
 
-## 🛠️ Teknologi
+## 🛠️ Technology Stack
 
 ### Frontend
 - HTML5
@@ -28,11 +28,11 @@ LaliLink adalah aplikasi web untuk manajemen kredensial yang aman dengan enkrips
 - Row Level Security (RLS)
 - Real-time subscriptions
 
-## 📋 Prasyarat
+## 📋 Prerequisites
 
-- Node.js (untuk development server)
-- Akun Supabase
-- Browser modern dengan dukungan Web Crypto API
+- Node.js (for development server)
+- Supabase account
+- Modern browser
 
 ## ⚡ Quick Start
 
@@ -49,132 +49,132 @@ npm install
 
 ### 3. Setup Supabase
 
-1. Buat project baru di [Supabase](https://supabase.com)
-2. Jalankan SQL migrations dari `database/schema.sql`
-3. Setup Row Level Security policies dari `database/policies.sql`
-4. Dapatkan URL dan ANON_KEY dari project settings
+1. Create a new project at [Supabase](https://supabase.com)
+2. Run SQL migrations from `database/schema.sql`
+3. Setup Row Level Security policies from `database/policies.sql`
+4. Get URL and ANON_KEY from project settings
 
-### 4. Konfigurasi
+### 4. Configuration
 
-⚠️ **PENTING**: Jangan pernah commit file `config.js` ke repository!
+⚠️ **IMPORTANT**: Never commit `config.js` file to repository!
 
-1. Copy file template konfigurasi:
+1. Copy configuration template:
 ```bash
 cp config.example.js config.js
 ```
 
-2. Edit file `config.js` dan update konfigurasi Supabase:
+2. Edit `config.js` file and update Supabase configuration:
 ```javascript
 const CONFIG = {
     SUPABASE: {
         URL: 'YOUR_SUPABASE_URL_HERE',
         ANON_KEY: 'YOUR_SUPABASE_ANON_KEY_HERE'
     },
-    // ... konfigurasi lainnya sudah ada
+    // ... other configurations are already set
 };
 ```
 
-3. File `config.js` sudah ada di `.gitignore` untuk keamanan
+3. `config.js` file is already in `.gitignore` for security
 
-### 5. Jalankan Development Server
+### 5. Run Development Server
 
 ```bash
 npm run dev
 ```
 
-Buka browser dan akses `http://localhost:8080`
+Open browser and access `http://localhost:8080`
 
-## 📁 Struktur Project
+## 📁 Project Structure
 
 ```
 lalilupa/
 ├── index.html              # Main HTML file
-├── config.js               # Konfigurasi aplikasi
-├── package.json            # Dependencies dan scripts
+├── config.js               # Application configuration
+├── package.json            # Dependencies and scripts
 ├── assets/
 │   └── js/
 │       ├── main.js         # Main application logic
 │       ├── auth.js         # Authentication manager
 │       ├── database.js     # Database operations
-│       ├── security.js     # Encryption/security
+│       ├── security.js     # Security utilities
 │       ├── ui.js           # UI management
 │       └── clipboard.js    # Clipboard operations
 ├── database/
 │   ├── schema.sql          # Database schema
 │   └── policies.sql        # RLS policies
-└── README.md               # Dokumentasi ini
+└── README.md               # This documentation
 ```
 
-## 🔐 Keamanan
+## 🔐 Security
 
-### ⚠️ Keamanan Konfigurasi
-- **JANGAN** commit file `config.js` ke repository
-- **GUNAKAN** `config.example.js` sebagai template
-- **SIMPAN** kredensial Supabase di environment variables untuk production
-- **AKTIFKAN** 2FA di akun Supabase Anda
+### ⚠️ Configuration Security
+- **DO NOT** commit `config.js` file to repository
+- **USE** `config.example.js` as template
+- **STORE** Supabase credentials in environment variables for production
+- **ENABLE** 2FA on your Supabase account
 
-### Enkripsi
-- **AES-256-GCM**: Enkripsi password di client-side
-- **Web Crypto API**: Implementasi kriptografi yang aman
-- **Secure Key Generation**: Generate key dari user session
+### Data Storage
+- **Plain Text Storage**: Passwords are stored as plain text in database
+- **Database Security**: Protected by Row Level Security (RLS)
+- **Access Control**: User-based data isolation
 
-### Autentikasi
+### Authentication
 - **Supabase Auth**: Email/password authentication
-- **JWT Tokens**: Session management yang aman
-- **Role-based Access**: Admin dan Viewer permissions
+- **JWT Tokens**: Secure session management
+- **Role-based Access**: Admin and Viewer permissions
 
 ### Database Security
-- **Row Level Security (RLS)**: Akses data berdasarkan user
+- **Row Level Security (RLS)**: User-based data access
 - **SQL Injection Prevention**: Parameterized queries
-- **Audit Logging**: Track semua operasi CRUD
+- **Audit Logging**: Track all CRUD operations
 
 ### Best Practices
-- Selalu gunakan HTTPS di production
-- Jangan share kredensial Supabase
-- Backup database secara berkala
-- Monitor aktivitas user yang mencurigakan
+- Always use HTTPS in production
+- Don't share Supabase credentials
+- Backup database regularly
+- Monitor suspicious user activities
 
 ## 👥 Role & Permissions
 
 ### Admin
-- ✅ Create, Read, Update, Delete semua entitas
+- ✅ Create, Read, Update, Delete all entities
 - ✅ Manage user roles
 - ✅ Access user management
 - ✅ Full system access
 
 ### Viewer
-- ✅ Read semua entitas
+- ✅ Read all entities
 - ❌ Create, Update, Delete operations
 - ❌ User management access
 - ❌ Role modifications
 
-## 🎯 Penggunaan
+## 🎯 Usage
 
-### 1. Registrasi/Login
-- Daftar dengan email dan password
-- Verifikasi email (jika diaktifkan)
-- Login dengan kredensial
+### 1. Registration/Login
+- Register with email and password
+- Email verification (if enabled)
+- Login with credentials
 
-### 2. Manajemen Klien
-- Tambah klien baru dengan informasi lengkap
-- Edit informasi klien
-- Hapus klien (akan menghapus semua data terkait)
+### 2. Client Management
+- Add new client with complete information
+- Edit client information
+- Delete client (will delete all related data)
 
-### 3. Manajemen Aplikasi
-- Pilih klien terlebih dahulu
-- Tambah aplikasi untuk klien tersebut
-- Kelola URL dan deskripsi aplikasi
+### 3. Application Management
+- Select client first
+- Add application for that client
+- Manage URL and application description
 
-### 4. Manajemen Kredensial
-- Pilih aplikasi terlebih dahulu
-- Tambah kredensial dengan username/password
-- Password otomatis dienkripsi
-- Copy kredensial ke clipboard dengan aman
+### 4. Credential Management
+- Select application first
+- Add credentials with username/password
+- Passwords are stored securely
+- Copy credentials to clipboard safely
 
 ### 5. User Management (Admin Only)
-- Lihat semua user yang terdaftar
-- Ubah role user (Admin/Viewer)
-- Monitor aktivitas user
+- View all registered users
+- Change user roles (Admin/Viewer)
+- Monitor user activities
 
 ## 🔧 Development
 
@@ -187,7 +187,7 @@ npm start       # Start production server (http-server)
 ### Code Structure
 
 #### Main App (`main.js`)
-- Orchestrates semua modules
+- Orchestrates all modules
 - Handles authentication flow
 - Manages application state
 
@@ -197,14 +197,14 @@ npm start       # Start production server (http-server)
 - Role-based permissions
 
 #### Database (`database.js`)
-- CRUD operations untuk semua entitas
+- CRUD operations for all entities
 - Caching mechanism
 - Error handling
 
 #### Security (`security.js`)
-- Password encryption/decryption
+- Security utilities
 - Secure password generation
-- Cryptographic utilities
+- Input validation
 
 #### UI Management (`ui.js`)
 - Modal management
@@ -222,24 +222,24 @@ npm start       # Start production server (http-server)
 ### Common Issues
 
 1. **Supabase Connection Error**
-   - Periksa URL dan ANON_KEY di `config.js`
-   - Pastikan project Supabase aktif
+   - Check URL and ANON_KEY in `config.js`
+   - Ensure Supabase project is active
 
 2. **Authentication Failed**
-   - Periksa email verification
-   - Cek RLS policies di Supabase
+   - Check email verification
+   - Verify RLS policies in Supabase
 
-3. **Encryption Error**
-   - Pastikan browser mendukung Web Crypto API
-   - Cek HTTPS connection (required untuk crypto)
+3. **Permission Denied**
+   - Check user role in database
+   - Verify RLS policies
 
-4. **Permission Denied**
-   - Periksa user role di database
-   - Verifikasi RLS policies
+4. **UI Issues**
+   - Clear browser cache
+   - Check browser console for errors
 
 ### Debug Mode
 
-Buka browser console untuk melihat detailed logs:
+Open browser console to see detailed logs:
 ```javascript
 // Enable debug mode
 window.laliApp.config.debug = true;
@@ -284,41 +284,43 @@ window.laliApp.config.debug = true;
 ## 🤝 Contributing
 
 1. Fork repository
-2. Buat feature branch (`git checkout -b feature/AmazingFeature`)
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
 3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push ke branch (`git push origin feature/AmazingFeature`)
-5. Buat Pull Request
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Create Pull Request
 
 ## 📄 License
 
-Project ini menggunakan MIT License. Lihat file `LICENSE` untuk detail.
+This project uses MIT License. See `LICENSE` file for details.
 
 ## 🆘 Support
 
-Jika mengalami masalah atau memiliki pertanyaan:
+If you encounter issues or have questions:
 
-1. Cek [Issues](../../issues) yang sudah ada
-2. Buat issue baru dengan detail lengkap
-3. Sertakan browser version dan error logs
+1. Check existing [Issues](../../issues)
+2. Create new issue with complete details
+3. Include browser version and error logs
 
 ## 🔄 Changelog
 
 ### v1.0.0 (Current)
 - ✅ Basic CRUD operations
 - ✅ Role-based access control
-- ✅ AES-256 encryption
+- ✅ Secure data storage
 - ✅ Responsive UI
 - ✅ Search functionality
 - ✅ Clipboard integration
+- ✅ Password visibility toggle
+- ✅ Dark theme support
 
 ### Planned Features
+- 🔄 Password encryption
 - 🔄 Backup/Export functionality
 - 🔄 Advanced search filters
 - 🔄 Activity audit logs
 - 🔄 Multi-language support
-- 🔄 Dark mode theme
 - 🔄 Mobile app (PWA)
 
 ---
 
-**LaliLink** - Secure, Simple, Scalable Credential Management 🔐
+**LaliLink** - Simple, Secure, Scalable Credential Management 🔐
