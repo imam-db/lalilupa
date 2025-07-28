@@ -4,8 +4,11 @@
   "description": "LaliLink - Aplikasi manajemen kredensial berbasis klien dengan Role-Based Access Control",
   "main": "index.html",
   "scripts": {
-    "dev": "live-server --port=8080 --open=/index.html",
+    "dev": "npm run dev:setup && live-server --port=8080 --open=/index.html",
+    "dev:setup": "node dev-setup.js",
     "start": "http-server -p 8080 -o",
+    "build": "node build-config.js",
+    "build:vercel": "node build-config.js",
     "setup:env": "copy .env.example .env",
     "setup:env:unix": "cp .env.example .env",
     "validate:env": "node -e \"const config = require('./config.js'); console.log('Environment valid:', config.validateEnvironment());\"",
