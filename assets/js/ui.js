@@ -78,6 +78,15 @@ class UIManager {
      * Bind event listeners
      */
     bindEvents() {
+        // Home button (LaliLink title) click event
+        const homeButton = document.querySelector('header h1');
+        if (homeButton) {
+            homeButton.style.cursor = 'pointer';
+            homeButton.addEventListener('click', () => {
+                this.showClientsView();
+            });
+        }
+
         // Navigation tabs
         this.navTabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -185,6 +194,9 @@ class UIManager {
         if (this.appContainer) {
             this.appContainer.classList.remove('hidden');
         }
+        
+        // Always show clients view as default after login
+        this.showClientsView();
     }
 
     /**
@@ -215,12 +227,22 @@ class UIManager {
     showClientsView() {
         this.currentView = 'clients';
         
+        // Save current view state
+        localStorage.setItem('lastView', 'clients');
+        localStorage.removeItem('lastClient');
+        localStorage.removeItem('lastApplication');
+        
         // Hide other contents
         if (this.applicationsContent) this.applicationsContent.classList.add('hidden');
         if (this.credentialsContent) this.credentialsContent.classList.add('hidden');
         
         // Show clients content
         if (this.clientsContent) this.clientsContent.classList.remove('hidden');
+        
+        // Show Add Client button when in clients view
+        if (this.addClientBtn && window.laliApp && window.laliApp.userPermissions?.clients?.canCreate) {
+            this.addClientBtn.style.display = 'flex';
+        }
         
         this.updateBreadcrumb([{ text: 'Clients', action: null }]);
         
@@ -236,12 +258,22 @@ class UIManager {
         this.currentClient = client;
         this.currentView = 'applications';
         
+        // Save current view state
+        localStorage.setItem('lastView', 'applications');
+        localStorage.setItem('lastClient', JSON.stringify(client));
+        localStorage.removeItem('lastApplication');
+        
         // Hide other contents
         if (this.clientsContent) this.clientsContent.classList.add('hidden');
         if (this.credentialsContent) this.credentialsContent.classList.add('hidden');
         
         // Show applications content
         if (this.applicationsContent) this.applicationsContent.classList.remove('hidden');
+        
+        // Hide Add Client button when not in clients view
+        if (this.addClientBtn) {
+            this.addClientBtn.style.display = 'none';
+        }
         
         // Update breadcrumb
         this.updateBreadcrumb([
@@ -267,12 +299,24 @@ class UIManager {
         this.currentApplication = application;
         this.currentView = 'credentials';
         
+        // Save current view state
+        localStorage.setItem('lastView', 'credentials');
+        localStorage.setItem('lastApplication', JSON.stringify(application));
+        if (this.currentClient) {
+            localStorage.setItem('lastClient', JSON.stringify(this.currentClient));
+        }
+        
         // Hide other contents
         if (this.clientsContent) this.clientsContent.classList.add('hidden');
         if (this.applicationsContent) this.applicationsContent.classList.add('hidden');
         
         // Show credentials content
         if (this.credentialsContent) this.credentialsContent.classList.remove('hidden');
+        
+        // Hide Add Client button when not in clients view
+        if (this.addClientBtn) {
+            this.addClientBtn.style.display = 'none';
+        }
         
         // Update breadcrumb
         this.updateBreadcrumb([
@@ -304,15 +348,20 @@ class UIManager {
             const isLast = index === items.length - 1;
             const classes = isLast 
                 ? 'text-gray-500 cursor-default'
-                : 'text-primary-600 hover:text-primary-800 cursor-pointer';
-            
-            const clickHandler = item.action && !isLast ? `onclick="${item.action}"` : '';
+                : 'text-blue-600 hover:text-blue-800 cursor-pointer';
             
             return `
-                <span class="${classes}" ${clickHandler}>${item.text}</span>
+                <span class="${classes}" data-breadcrumb-index="${index}">${item.text}</span>
                 ${!isLast ? '<span class="text-gray-400 mx-2">/</span>' : ''}
             `;
         }).join('');
+        
+        // Add click event listeners for breadcrumb items
+        this.breadcrumbNav.querySelectorAll('[data-breadcrumb-index]').forEach((element, index) => {
+            if (index < items.length - 1 && items[index].action) {
+                element.addEventListener('click', items[index].action);
+            }
+        });
     }
 
     // ==================== MODAL MANAGEMENT ====================
@@ -533,7 +582,7 @@ class UIManager {
     }
 
     /**
-     * Render applications list
+     * Render applications list with embedded credentials
      * @param {Array} applications - Applications array
      * @param {Object} permissions - User permissions
      */
@@ -552,34 +601,73 @@ class UIManager {
         }
         
         this.applicationsList.innerHTML = applications.map(app => `
-            <div class="application-card bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700" 
-                 onclick="window.laliApp.ui.navigateToCredentials(${JSON.stringify(app).replace(/"/g, '&quot;')}); window.laliApp.ui.showToast('Loading credentials for ${app.app_name}...', 'info', 2000);">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(app.app_name)}</h3>
-                        <p class="text-gray-600 dark:text-gray-300">${this.escapeHtml(app.app_url || '')}</p>
+            <div class="application-card bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(app.app_name)}</h3>
+                            <p class="text-gray-600 dark:text-gray-300">${this.escapeHtml(app.app_url || '')}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            ${app.app_url ? `
+                                <button onclick="window.laliApp.copyUrl('${app.app_url}'); window.laliApp.ui.showToast('URL copied to clipboard', 'success', 2000);" 
+                                        class="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 p-2 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors" title="Copy URL">
+                                    <i class="fas fa-link text-lg"></i>
+                                </button>
+                            ` : ''}
+                            ${permissions.canUpdate ? `
+                                <button onclick="window.laliApp.editApplication(${app.id}); window.laliApp.ui.showToast('Opening application editor...', 'info', 2000);" 
+                                        class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit Application">
+                                    <i class="fas fa-edit text-lg"></i>
+                                </button>
+                            ` : ''}
+                            ${permissions.canDelete ? `
+                                <button onclick="if(confirm('Are you sure you want to delete this application?')) { window.laliApp.deleteApplication(${app.id}); window.laliApp.ui.showToast('Application deleted successfully', 'success'); }" 
+                                        class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Application">
+                                    <i class="fas fa-trash text-lg"></i>
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
-                    <div class="flex space-x-3">
-                        ${permissions.canUpdate ? `
-                            <button onclick="event.stopPropagation(); window.laliApp.editApplication(${app.id}); window.laliApp.ui.showToast('Opening application editor...', 'info', 2000);" 
-                                    class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit Application">
-                                <i class="fas fa-edit text-lg"></i>
-                            </button>
-                        ` : ''}
-                        ${permissions.canDelete ? `
-                            <button onclick="event.stopPropagation(); if(confirm('Are you sure you want to delete this application?')) { window.laliApp.deleteApplication(${app.id}); window.laliApp.ui.showToast('Application deleted successfully', 'success'); }" 
-                                    class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Application">
-                                <i class="fas fa-trash text-lg"></i>
-                            </button>
-                        ` : ''}
+                    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        <p><i class="fas fa-info-circle mr-2"></i>${this.escapeHtml(app.description || 'No description')}</p>
+                        <p><i class="fas fa-calendar mr-2"></i>Created: ${this.formatDate(app.created_at)}</p>
                     </div>
-                </div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">
-                    <p><i class="fas fa-info-circle mr-2"></i>${this.escapeHtml(app.description || 'No description')}</p>
-                    <p><i class="fas fa-calendar mr-2"></i>Created: ${this.formatDate(app.created_at)}</p>
+                    
+                    <!-- Credentials Section -->
+                    <div class="border-t dark:border-gray-700 pt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-md font-medium text-gray-900 dark:text-white flex items-center">
+                                <i class="fas fa-key mr-2"></i>Credentials
+                                <span class="ml-2 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full" id="credCount-${app.id}">0</span>
+                            </h4>
+                            <div class="flex space-x-2">
+                                ${permissions.canCreate ? `
+                                    <button onclick="window.laliApp.showAddCredentialModal(${app.id}); window.laliApp.ui.showToast('Opening credential form...', 'info', 2000);" 
+                                            class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-1 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-sm" title="Add Credential">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                ` : ''}
+                                <button onclick="window.laliApp.ui.toggleCredentials(${app.id}); window.laliApp.ui.loadCredentialsForApp(${app.id});" 
+                                        class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 p-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors text-sm" title="Toggle Credentials">
+                                     <i class="fas fa-chevron-down" id="chevron-${app.id}"></i>
+                                 </button>
+                            </div>
+                        </div>
+                        <div class="credentials-container hidden" id="credentials-${app.id}">
+                            <div class="space-y-3" id="credentialsList-${app.id}">
+                                <!-- Credentials will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `).join('');
+        
+        // Load credentials for each application
+        applications.forEach(app => {
+            this.loadCredentialsForApp(app.id);
+        });
     }
 
     /**
@@ -695,6 +783,184 @@ class UIManager {
         `).join('');
     }
 
+    /**
+     * Toggle credentials visibility for an application
+     * @param {number} appId - Application ID
+     */
+    toggleCredentials(appId) {
+        const container = document.getElementById(`credentials-${appId}`);
+        const chevron = document.getElementById(`chevron-${appId}`);
+        
+        if (container && chevron) {
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                chevron.classList.remove('fa-chevron-down');
+                chevron.classList.add('fa-chevron-up');
+            } else {
+                container.classList.add('hidden');
+                chevron.classList.remove('fa-chevron-up');
+                chevron.classList.add('fa-chevron-down');
+            }
+        }
+    }
+
+    /**
+     * Toggle password visibility for a credential
+     * @param {string} credId - Credential ID
+     */
+    togglePasswordVisibility(credId) {
+        const passwordSpan = document.getElementById(`password-${credId}`);
+        const eyeIcon = document.getElementById(`eye-${credId}`);
+        const button = eyeIcon?.parentElement;
+        
+        if (passwordSpan && eyeIcon && button) {
+            const isCurrentlyHidden = passwordSpan.textContent === '••••••••••••';
+            
+            if (isCurrentlyHidden) {
+                // Show password
+                passwordSpan.textContent = passwordSpan.dataset.password;
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+                button.querySelector('span').textContent = 'Hide';
+            } else {
+                // Hide password
+                passwordSpan.textContent = '••••••••••••';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+                button.querySelector('span').textContent = 'Show';
+            }
+        }
+    }
+
+    /**
+     * Load credentials for a specific application
+     * @param {number} appId - Application ID
+     */
+    async loadCredentialsForApp(appId) {
+        try {
+            const { data: credentials, error } = await window.laliApp.database.getCredentials(appId);
+            
+            if (error) {
+                console.error('Failed to load credentials:', error);
+                return;
+            }
+            
+            this.renderCredentialsForApp(appId, credentials || []);
+            
+            // Update credential count
+            const countEl = document.getElementById(`credCount-${appId}`);
+            if (countEl) {
+                countEl.textContent = (credentials || []).length;
+            }
+        } catch (error) {
+            console.error('Error loading credentials:', error);
+        }
+    }
+
+    /**
+     * Render credentials for a specific application
+     * @param {number} appId - Application ID
+     * @param {Array} credentials - Credentials array
+     */
+    renderCredentialsForApp(appId, credentials) {
+        const container = document.getElementById(`credentialsList-${appId}`);
+        if (!container) return;
+        
+        if (!credentials || credentials.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                    <i class="fas fa-key text-2xl mb-2"></i>
+                    <p>No credentials found</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const permissions = window.laliApp.userPermissions.credentials;
+        
+        container.innerHTML = credentials.map(cred => `
+            <div class="credential-item bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <div class="mb-4">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex-1">
+                            <h5 class="font-medium text-gray-900 dark:text-white mb-1">${this.escapeHtml(cred.name || 'Unnamed Credential')}</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">${this.escapeHtml(cred.description || 'No description')}</p>
+                            ${cred.url ? `<p class="text-xs text-blue-600 dark:text-blue-400 mt-1"><i class="fas fa-link mr-1"></i>${this.escapeHtml(cred.url)}</p>` : ''}
+                        </div>
+                        <div class="flex space-x-2">
+                            ${permissions.canUpdate ? `
+                                <button onclick="window.laliApp.editCredential(${cred.id}); window.laliApp.ui.showToast('Opening editor...', 'info', 2000);" 
+                                        class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit">
+                                    <i class="fas fa-edit text-base"></i>
+                                </button>
+                            ` : ''}
+                            ${permissions.canDelete ? `
+                                <button onclick="if(confirm('Delete this credential?')) { window.laliApp.deleteCredential(${cred.id}); window.laliApp.ui.showToast('Credential deleted', 'success'); }" 
+                                        class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete">
+                                    <i class="fas fa-trash text-base"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Username Section -->
+                    <div class="mb-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Username:</span>
+                            <button onclick="window.laliApp.copyUsername('${cred.username}'); window.laliApp.ui.showToast('Username copied', 'success', 2000);" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 min-w-[80px]" title="Copy Username">
+                                <i class="fas fa-copy"></i>
+                                <span>Copy</span>
+                            </button>
+                        </div>
+                        <div class="font-mono bg-gray-100 dark:bg-gray-600 px-3 py-2 rounded-lg text-gray-900 dark:text-white break-all">
+                            ${this.escapeHtml(cred.username)}
+                        </div>
+                    </div>
+                    
+                    <!-- Password Section -->
+                    <div class="mb-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Password:</span>
+                            <div class="flex space-x-2">
+                                <button onclick="window.laliApp.ui.togglePasswordVisibility('${cred.id}')" 
+                                         class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 min-w-[80px]" title="Show/Hide Password">
+                                     <i id="eye-${cred.id}" class="fas fa-eye"></i>
+                                     <span>Show</span>
+                                 </button>
+                                <button onclick="window.laliApp.copyPassword(${cred.id}); window.laliApp.ui.showToast('Password copied', 'success', 2000);" 
+                                        class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 min-w-[80px]" title="Copy Password">
+                                    <i class="fas fa-copy"></i>
+                                    <span>Copy</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="font-mono bg-gray-100 dark:bg-gray-600 px-3 py-2 rounded-lg text-gray-900 dark:text-white break-all">
+                            <span id="password-${cred.id}" data-password="${this.escapeHtml(cred.pwd || '')}">••••••••••••</span>
+                        </div>
+                    </div>
+                    
+                    ${cred.url ? `
+                        <!-- URL Section -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">URL:</span>
+                                <button onclick="window.laliApp.copyUrl('${cred.url}'); window.laliApp.ui.showToast('URL copied', 'success', 2000);" 
+                                        class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 min-w-[80px]" title="Copy URL">
+                                    <i class="fas fa-copy"></i>
+                                    <span>Copy</span>
+                                </button>
+                            </div>
+                            <div class="font-mono bg-gray-100 dark:bg-gray-600 px-3 py-2 rounded-lg text-blue-600 dark:text-blue-400 break-all">
+                                <a href="${cred.url}" target="_blank" class="hover:underline">${this.escapeHtml(cred.url)}</a>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
     // ==================== UTILITY METHODS ====================
 
     /**
@@ -769,28 +1035,93 @@ class UIManager {
      * Initialize dark theme toggle
      */
     initializeDarkTheme() {
-        const themeToggle = document.getElementById('themeToggle');
-        if (!themeToggle) return;
+        // Wait for DOM to be ready
+        const initTheme = () => {
+            const themeToggle = document.getElementById('themeToggle');
+            if (!themeToggle) {
+                console.warn('Theme toggle button not found - retrying...');
+                // Retry after a delay
+                setTimeout(initTheme, 500);
+                return;
+            }
 
-        // Check for saved theme preference or default to light mode
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            console.log('Theme toggle button found, initializing...');
+
+            // Check for saved theme preference or default to light mode
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            console.log('Saved theme:', savedTheme, 'Prefers dark:', prefersDark);
+            
+            // Apply initial theme
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+                console.log('Applied dark theme on init');
+            } else {
+                document.documentElement.classList.remove('dark');
+                console.log('Applied light theme on init');
+            }
+
+            // Remove any existing event listeners by cloning
+            const newThemeToggle = themeToggle.cloneNode(true);
+            themeToggle.parentNode.replaceChild(newThemeToggle, themeToggle);
+
+            // Toggle theme on button click
+            newThemeToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Theme toggle button clicked!');
+                
+                const htmlElement = document.documentElement;
+                const currentlyDark = htmlElement.classList.contains('dark');
+                console.log('Currently dark mode:', currentlyDark);
+                
+                // Force remove all theme classes first
+                htmlElement.classList.remove('dark');
+                
+                if (currentlyDark) {
+                    // Switch to light theme
+                    localStorage.setItem('theme', 'light');
+                    this.showToast('Switched to light theme', 'success', 2000);
+                    console.log('Switched to light theme');
+                } else {
+                    // Switch to dark theme
+                    htmlElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                    this.showToast('Switched to dark theme', 'success', 2000);
+                    console.log('Switched to dark theme');
+                }
+                
+                // Update theme toggle icons
+                const moonIcon = newThemeToggle.querySelector('.fa-moon');
+                const sunIcon = newThemeToggle.querySelector('.fa-sun');
+                
+                if (moonIcon && sunIcon) {
+                    if (htmlElement.classList.contains('dark')) {
+                        moonIcon.classList.add('hidden');
+                        sunIcon.classList.remove('hidden');
+                    } else {
+                        moonIcon.classList.remove('hidden');
+                        sunIcon.classList.add('hidden');
+                    }
+                }
+                
+                // Force repaint with requestAnimationFrame
+                requestAnimationFrame(() => {
+                    document.body.style.transform = 'translateZ(0)';
+                    requestAnimationFrame(() => {
+                        document.body.style.transform = '';
+                        console.log('Theme repaint completed');
+                    });
+                });
+            });
+            
+            console.log('Theme toggle initialized successfully');
+        };
         
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-            document.documentElement.classList.add('dark');
-        }
-
-        // Toggle theme on button click
-        themeToggle.addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            
-            // Save theme preference
-            const isDark = document.documentElement.classList.contains('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            
-            // Show toast notification
-            this.showToast(`Switched to ${isDark ? 'dark' : 'light'} theme`, 'success');
-        });
+        // Try to initialize immediately, then retry if needed
+        setTimeout(initTheme, 100);
     }
 
     /**

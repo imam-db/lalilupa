@@ -201,6 +201,8 @@ class LaliLinkApp {
         if (showLoginBtn) {
             showLoginBtn.addEventListener('click', () => this.toggleAuthForm('login'));
         }
+        
+        // Password toggle will be setup when modal is opened
     }
 
     // ==================== AUTHENTICATION ====================
@@ -241,6 +243,39 @@ class LaliLinkApp {
                 
                 // Load initial data
                 await this.loadInitialData();
+                
+                // Restore last visited page or default to clients view
+                const lastView = localStorage.getItem('lastView');
+                const lastClient = localStorage.getItem('lastClient');
+                const lastApplication = localStorage.getItem('lastApplication');
+                
+                if (lastView === 'applications' && lastClient) {
+                    try {
+                        const client = JSON.parse(lastClient);
+                        this.ui.navigateToApplications(client);
+                        await this.loadApplications(client);
+                    } catch (e) {
+                        console.warn('Failed to restore applications view:', e);
+                        this.ui.showClientsView();
+                    }
+                } else if (lastView === 'credentials' && lastApplication) {
+                    try {
+                        const application = JSON.parse(lastApplication);
+                        const client = lastClient ? JSON.parse(lastClient) : null;
+                        if (client) {
+                            this.ui.currentClient = client;
+                            this.ui.navigateToCredentials(application);
+                            await this.loadCredentials(application);
+                        } else {
+                            this.ui.showClientsView();
+                        }
+                    } catch (e) {
+                        console.warn('Failed to restore credentials view:', e);
+                        this.ui.showClientsView();
+                    }
+                } else {
+                    this.ui.showClientsView();
+                }
                 
                 this.ui.showToast('Welcome to LaliLink!', 'success');
             } else if (event === 'SIGNED_OUT') {
@@ -349,6 +384,12 @@ class LaliLinkApp {
     async handleLogout() {
         try {
             this.ui.showLoading('Signing out...');
+            
+            // Clear navigation state before logout
+            localStorage.removeItem('lastView');
+            localStorage.removeItem('lastClient');
+            localStorage.removeItem('lastApplication');
+            
             await this.auth.signOut();
             // Success is handled by auth state change
         } catch (error) {
@@ -387,15 +428,10 @@ class LaliLinkApp {
             
             if (error) {
                 // Create profile if it doesn't exist
-                const { data: newProfile, error: createError } = await this.auth.createUserProfile({
-                    user_id: this.currentUser.id,
-                    email: this.currentUser.email,
-                    full_name: this.currentUser.user_metadata?.full_name || '',
-                    role: this.config.roles.defaultRole
-                });
+                const newProfile = await this.auth.createUserProfile();
                 
-                if (createError) {
-                    throw createError;
+                if (!newProfile) {
+                    throw new Error('Failed to create user profile');
                 }
                 
                 this.userProfile = newProfile;
@@ -404,7 +440,7 @@ class LaliLinkApp {
             }
             
             // Load permissions
-            this.userPermissions = await this.auth.getUserPermissions(this.userProfile.role);
+            this.userPermissions = this.auth.getUserPermissions();
             
             // Update role-based UI
             this.ui.updateRoleBasedUI(this.userProfile.role, this.userPermissions);
@@ -464,15 +500,28 @@ class LaliLinkApp {
      */
     async updateStats() {
         try {
-            const stats = {
-                clients: this.clients.length,
-                applications: this.applications.length,
-                credentials: this.credentials.length
-            };
+            // Only update stats if user is authenticated
+            if (!this.currentUser) {
+                return;
+            }
             
+            // Get statistics from database
+            const stats = await this.database.getStatistics();
             this.ui.updateStats(stats);
         } catch (error) {
             console.error('Error updating stats:', error);
+            // Fallback to UI-based counting if database fails
+            const clientsCount = this.ui.clientsList?.children.length || 0;
+            const applicationsCount = this.ui.applicationsList?.children.length || 0;
+            const credentialsCount = this.ui.credentialsList?.children.length || 0;
+            
+            const fallbackStats = {
+                clients: clientsCount,
+                applications: applicationsCount,
+                credentials: credentialsCount
+            };
+            
+            this.ui.updateStats(fallbackStats);
         }
     }
 
@@ -655,7 +704,7 @@ class LaliLinkApp {
      * Show add client modal
      */
     showAddClientModal() {
-        if (!this.auth.canPerform(this.userProfile.role, 'clients', 'create')) {
+        if (!this.auth.canPerform('clients', 'create')) {
             this.ui.showToast('You do not have permission to create clients', 'error');
             return;
         }
@@ -680,12 +729,7 @@ class LaliLinkApp {
      * Show add application modal
      */
     showAddApplicationModal() {
-        if (!this.ui.currentClient) {
-            this.ui.showToast('Please select a client first', 'error');
-            return;
-        }
-        
-        if (!this.auth.canPerform(this.userProfile.role, 'applications', 'create')) {
+        if (!this.auth.canPerform('applications', 'create')) {
             this.ui.showToast('You do not have permission to create applications', 'error');
             return;
         }
@@ -708,17 +752,16 @@ class LaliLinkApp {
 
     /**
      * Show add credential modal
+     * @param {number} appId - Application ID
      */
-    showAddCredentialModal() {
-        if (!this.ui.currentApplication) {
-            this.ui.showToast('Please select an application first', 'error');
-            return;
-        }
-        
-        if (!this.auth.canPerform(this.userProfile.role, 'credentials', 'create')) {
+    showAddCredentialModal(appId) {
+        if (!this.auth.canPerform('credentials', 'create')) {
             this.ui.showToast('You do not have permission to create credentials', 'error');
             return;
         }
+        
+        // Set the application ID for the credential
+        this.currentApplicationId = appId;
         
         // Reset form
         if (this.ui.credentialForm) {
@@ -740,6 +783,11 @@ class LaliLinkApp {
         }
         
         this.ui.showModal(this.ui.credentialModal);
+        
+        // Setup password toggle after modal is shown
+        setTimeout(() => {
+            this.setupPasswordToggle();
+        }, 100);
     }
 
     // ==================== FORM HANDLERS ====================
@@ -848,36 +896,57 @@ class LaliLinkApp {
         e.preventDefault();
         
         const form = e.target;
-        const username = form.querySelector('#credentialUsername').value;
-        const password = form.querySelector('#credentialPassword').value;
-        const url = form.querySelector('#credentialUrl').value;
-        const description = form.querySelector('#credentialDescription').value;
+        const credentialName = form.querySelector('#credentialName')?.value?.trim();
+        const username = form.querySelector('#credentialUsername')?.value?.trim();
+        const password = form.querySelector('#credentialPassword')?.value;
+        const role = form.querySelector('#credentialRole')?.value?.trim();
+        const notes = form.querySelector('#credentialNotes')?.value?.trim();
+        
+        console.log('Credential form submission:', { credentialName, username, password: password ? '[HIDDEN]' : 'empty', role, notes });
+        
+        if (!credentialName || !username || !password || !role) {
+            this.ui.showToast('Please fill in all required fields', 'error');
+            return;
+        }
+        
+        // Validate app_id
+        const appId = this.currentApplicationId || this.ui.currentApplication?.id;
+        if (!appId) {
+            console.error('No application ID found for credential');
+            this.ui.showToast('No application selected for credential', 'error');
+            return;
+        }
         
         try {
-            this.ui.showLoading('Encrypting and saving credential...');
-            
-            // Encrypt password
-            const encryptedPassword = await this.security.encryptPassword(password);
+            this.ui.showLoading('Saving credential...');
             
             const credData = {
-                app_id: this.ui.currentApplication.id,
+                app_id: parseInt(appId),
+                name: credentialName,
                 username: username,
-                encrypted_password: encryptedPassword,
-                url: url,
-                description: description
+                pwd: password,
+                role: role,
+                notes: notes || null
             };
+            
+            console.log('Credential data to save:', { ...credData, pwd: '[HIDDEN]' });
             
             const mode = e.target.dataset.mode;
             const credId = e.target.dataset.credentialId;
             
             let result;
             if (mode === 'create') {
+                console.log('Creating new credential...');
                 result = await this.database.createCredential(credData);
             } else {
+                console.log('Updating credential:', credId);
                 result = await this.database.updateCredential(parseInt(credId), credData);
             }
             
+            console.log('Database result:', result);
+            
             if (result.error) {
+                console.error('Database error:', result.error);
                 throw result.error;
             }
             
@@ -887,11 +956,28 @@ class LaliLinkApp {
             );
             
             this.ui.closeModal(this.ui.credentialModal);
-            await this.loadCredentials(this.ui.currentApplication);
+            
+            // Reload credentials for the specific application
+            if (appId) {
+                console.log('Reloading credentials for app:', appId);
+                await this.ui.loadCredentialsForApp(appId);
+                
+                // Also reload applications view if we're in applications view
+                if (this.ui.currentView === 'applications') {
+                    console.log('Reloading applications view after credential save');
+                    await this.loadApplications(this.ui.currentClient);
+                }
+            }
             
         } catch (error) {
             console.error('Failed to save credential:', error);
-            this.ui.showToast('Failed to save credential', 'error');
+            let errorMessage = 'Failed to save credential';
+            
+            if (error.message) {
+                errorMessage += ': ' + error.message;
+            }
+            
+            this.ui.showToast(errorMessage, 'error');
         } finally {
             this.ui.hideLoading();
         }
@@ -936,6 +1022,11 @@ class LaliLinkApp {
      * @param {number} clientId - Client ID
      */
     async editClient(clientId) {
+        if (!this.auth.canPerform('clients', 'update')) {
+            this.ui.showToast('You do not have permission to edit clients', 'error');
+            return;
+        }
+        
         try {
             const { data: client, error } = await this.database.getClientById(clientId);
             
@@ -972,6 +1063,11 @@ class LaliLinkApp {
      * @param {number} appId - Application ID
      */
     async editApplication(appId) {
+        if (!this.auth.canPerform('applications', 'update')) {
+            this.ui.showToast('You do not have permission to edit applications', 'error');
+            return;
+        }
+        
         try {
             const { data: app, error } = await this.database.getApplicationById(appId);
             
@@ -1009,6 +1105,11 @@ class LaliLinkApp {
      * @param {number} credId - Credential ID
      */
     async editCredential(credId) {
+        if (!this.auth.canPerform('credentials', 'update')) {
+            this.ui.showToast('You do not have permission to edit credentials', 'error');
+            return;
+        }
+        
         try {
             const { data: cred, error } = await this.database.getCredentialById(credId);
             
@@ -1016,15 +1117,13 @@ class LaliLinkApp {
                 throw new Error('Credential not found');
             }
             
-            // Decrypt password
-            const decryptedPassword = await this.security.decryptPassword(cred.encrypted_password);
-            
             // Populate form
             if (this.ui.credentialForm) {
+                this.ui.credentialForm.querySelector('#credentialName').value = cred.name || '';
                 this.ui.credentialForm.querySelector('#credentialUsername').value = cred.username || '';
-                this.ui.credentialForm.querySelector('#credentialPassword').value = decryptedPassword || '';
-                this.ui.credentialForm.querySelector('#credentialUrl').value = cred.url || '';
-                this.ui.credentialForm.querySelector('#credentialDescription').value = cred.description || '';
+                this.ui.credentialForm.querySelector('#credentialPassword').value = cred.pwd || '';
+                this.ui.credentialForm.querySelector('#credentialRole').value = cred.role || '';
+                this.ui.credentialForm.querySelector('#credentialNotes').value = cred.notes || '';
                 
                 this.ui.credentialForm.dataset.mode = 'edit';
                 this.ui.credentialForm.dataset.credentialId = credId;
@@ -1038,6 +1137,11 @@ class LaliLinkApp {
             
             this.ui.showModal(this.ui.credentialModal);
             
+            // Setup password toggle after modal is shown
+            setTimeout(() => {
+                this.setupPasswordToggle();
+            }, 100);
+            
         } catch (error) {
             console.error('Failed to load credential for editing:', error);
             this.ui.showToast('Failed to load credential', 'error');
@@ -1050,7 +1154,7 @@ class LaliLinkApp {
      * @param {string} currentRole - Current role
      */
     editUserRole(userId, currentRole) {
-        if (!this.auth.canPerform(this.userProfile.role, 'users', 'update')) {
+        if (!this.auth.canPerform('users', 'update')) {
             this.ui.showToast('You do not have permission to edit user roles', 'error');
             return;
         }
@@ -1071,7 +1175,7 @@ class LaliLinkApp {
      * @param {number} clientId - Client ID
      */
     deleteClient(clientId) {
-        if (!this.auth.canPerform(this.userProfile.role, 'clients', 'delete')) {
+        if (!this.auth.canPerform('clients', 'delete')) {
             this.ui.showToast('You do not have permission to delete clients', 'error');
             return;
         }
@@ -1109,7 +1213,7 @@ class LaliLinkApp {
      * @param {number} appId - Application ID
      */
     deleteApplication(appId) {
-        if (!this.auth.canPerform(this.userProfile.role, 'applications', 'delete')) {
+        if (!this.auth.canPerform('applications', 'delete')) {
             this.ui.showToast('You do not have permission to delete applications', 'error');
             return;
         }
@@ -1147,7 +1251,7 @@ class LaliLinkApp {
      * @param {number} credId - Credential ID
      */
     deleteCredential(credId) {
-        if (!this.auth.canPerform(this.userProfile.role, 'credentials', 'delete')) {
+        if (!this.auth.canPerform('credentials', 'delete')) {
             this.ui.showToast('You do not have permission to delete credentials', 'error');
             return;
         }
@@ -1180,6 +1284,65 @@ class LaliLinkApp {
         );
     }
 
+    // ==================== UI HELPER FUNCTIONS ====================
+
+    /**
+     * Setup password toggle functionality
+     */
+    setupPasswordToggle() {
+        console.log('Setting up password toggle');
+        
+        const toggleButton = document.getElementById('toggleCredentialPassword');
+        if (toggleButton) {
+            // Remove existing event listeners
+            toggleButton.removeEventListener('click', this.handlePasswordToggle);
+            // Add new event listener
+            this.handlePasswordToggle = (e) => {
+                e.preventDefault();
+                this.toggleCredentialPasswordVisibility();
+            };
+            toggleButton.addEventListener('click', this.handlePasswordToggle);
+            console.log('Password toggle event listener attached');
+        } else {
+            console.error('Toggle button not found');
+        }
+    }
+    
+    /**
+     * Toggle password visibility for credential form
+     */
+    toggleCredentialPasswordVisibility() {
+        console.log('toggleCredentialPasswordVisibility called');
+        
+        const passwordInput = document.getElementById('credentialPassword');
+        const toggleButton = document.getElementById('toggleCredentialPassword');
+        const toggleIcon = document.getElementById('credentialPasswordIcon');
+        
+        console.log('Password input:', passwordInput);
+        console.log('Toggle button:', toggleButton);
+        console.log('Toggle icon:', toggleIcon);
+        
+        if (!passwordInput || !toggleButton || !toggleIcon) {
+            console.error('Password toggle elements not found');
+            return;
+        }
+        
+        const isPassword = passwordInput.type === 'password';
+        console.log('Current type:', passwordInput.type, 'isPassword:', isPassword);
+        
+        if (isPassword) {
+            passwordInput.type = 'text';
+            toggleIcon.className = 'fas fa-eye-slash';
+            toggleButton.title = 'Hide password';
+            console.log('Changed to text type');
+        } else {
+            passwordInput.type = 'password';
+            toggleIcon.className = 'fas fa-eye';
+            toggleButton.title = 'Show password';
+            console.log('Changed to password type');
+        }
+    }
+
     // ==================== CLIPBOARD FUNCTIONS ====================
 
     /**
@@ -1188,8 +1351,8 @@ class LaliLinkApp {
      */
     async copyUsername(username) {
         try {
-            await this.clipboard.copyUsername(username);
-            this.ui.showToast('Username copied to clipboard', 'success');
+            await navigator.clipboard.writeText(username);
+            this.ui.showToast('Username copied to clipboard!', 'success');
         } catch (error) {
             console.error('Failed to copy username:', error);
             this.ui.showToast('Failed to copy username', 'error');
@@ -1202,24 +1365,21 @@ class LaliLinkApp {
      */
     async copyPassword(credId) {
         try {
-            this.ui.showLoading('Decrypting password...');
-            
             const { data: cred, error } = await this.database.getCredentialById(credId);
             
             if (error || !cred) {
                 throw new Error('Credential not found');
             }
             
-            const decryptedPassword = await this.security.decryptPassword(cred.encrypted_password);
-            await this.clipboard.copyPassword(decryptedPassword);
+            // Use the password directly from pwd column
+            const password = cred.pwd || '';
+            await navigator.clipboard.writeText(password);
             
-            this.ui.showToast('Password copied to clipboard', 'success');
+            this.ui.showToast('Password copied to clipboard!', 'success');
             
         } catch (error) {
             console.error('Failed to copy password:', error);
             this.ui.showToast('Failed to copy password', 'error');
-        } finally {
-            this.ui.hideLoading();
         }
     }
 
@@ -1229,8 +1389,8 @@ class LaliLinkApp {
      */
     async copyUrl(url) {
         try {
-            await this.clipboard.copyUrl(url);
-            this.ui.showToast('URL copied to clipboard', 'success');
+            await navigator.clipboard.writeText(url);
+            this.ui.showToast('URL copied to clipboard!', 'success');
         } catch (error) {
             console.error('Failed to copy URL:', error);
             this.ui.showToast('Failed to copy URL', 'error');
@@ -1263,8 +1423,9 @@ class LaliLinkApp {
 }
 
 // Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     window.laliApp = new LaliLinkApp();
+    await window.laliApp.init();
 });
 
 // Export for use in other modules

@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 -- Create clients table
 CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     client_name TEXT NOT NULL,
     company_name TEXT,
     notes TEXT,
@@ -51,7 +50,7 @@ CREATE TABLE IF NOT EXISTS credentials (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_role ON user_profiles(role);
-CREATE INDEX IF NOT EXISTS idx_clients_user_id ON clients(user_id);
+-- Removed idx_clients_user_id index as user_id column was removed
 CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(client_name);
 CREATE INDEX IF NOT EXISTS idx_applications_client_id ON applications(client_id);
 CREATE INDEX IF NOT EXISTS idx_applications_name ON applications(app_name);

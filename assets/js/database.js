@@ -123,28 +123,15 @@ class DatabaseManager {
 
             const { data, error } = await this.supabase
                 .from('user_profiles')
-                .select(`
-                    *,
-                    user_id
-                `)
+                .select('*')
                 .order('created_at', { ascending: false });
 
             if (!error && data) {
-                // Get user emails from auth.users (this might need adjustment based on RLS)
-                const enrichedData = await Promise.all(
-                    data.map(async (profile) => {
-                        try {
-                            // Note: Getting user email from auth.users might require admin privileges
-                            // For now, we'll use the user_id and try to get email from current session
-                            return {
-                                ...profile,
-                                email: profile.user_id // Placeholder - adjust based on your setup
-                            };
-                        } catch (err) {
-                            return profile;
-                        }
-                    })
-                );
+                // Return the user profiles data directly
+                const enrichedData = data.map(profile => ({
+                    ...profile,
+                    email: profile.email || 'No email available'
+                }));
 
                 this.updateCache('users', enrichedData);
                 return { data: enrichedData, error: null };
@@ -221,7 +208,6 @@ class DatabaseManager {
 
             const newClient = {
                 ...clientData,
-                user_id: user.id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
