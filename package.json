@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "live-server --port=8080 --open=/index.html",
     "start": "http-server -p 8080 -o",
+    "setup:env": "copy .env.example .env",
+    "setup:env:unix": "cp .env.example .env",
+    "validate:env": "node -e \"const config = require('./config.js'); console.log('Environment valid:', config.validateEnvironment());\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
