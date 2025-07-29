@@ -11,6 +11,11 @@ class UIManager {
         this.breadcrumb = [];
         this.searchTimeout = null;
         this.isLoading = false;
+        this.loadingStartTime = null;
+        this.isNavigating = false;
+        this.navigationTimeout = null;
+        this.hideLoadingTimeout = null;
+        this.breadcrumbClickHandler = null;
         
         // Initialize UI elements
         this.initializeElements();
@@ -148,7 +153,9 @@ class UIManager {
      * @param {string} message - Loading message
      */
     showLoading(message = 'Loading...') {
+        // Always show loading, even if already loading (update message)
         this.isLoading = true;
+        this.loadingStartTime = Date.now();
         if (this.loadingOverlay) {
             const loadingText = this.loadingOverlay.querySelector('.loading-text');
             if (loadingText) {
@@ -162,9 +169,17 @@ class UIManager {
 
     /**
      * Hide loading overlay
+     * @param {boolean} force - Force hide even if loading was started recently
      */
-    hideLoading() {
+    hideLoading(force = false) {
+        // Clear any pending hide timeout
+        if (this.hideLoadingTimeout) {
+            clearTimeout(this.hideLoadingTimeout);
+            this.hideLoadingTimeout = null;
+        }
+        
         this.isLoading = false;
+        this.loadingStartTime = null;
         if (this.loadingOverlay) {
             this.loadingOverlay.classList.add('hidden');
         } else {
@@ -195,8 +210,8 @@ class UIManager {
             this.appContainer.classList.remove('hidden');
         }
         
-        // Always show clients view as default after login
-        this.showClientsView();
+        // Navigation is handled by handleAuthStateChange in main.js
+        // Don't force clients view here to maintain current view state
     }
 
     /**
@@ -344,6 +359,14 @@ class UIManager {
         
         if (!this.breadcrumbNav) return;
         
+        // Remove existing event listener if any
+        if (this.breadcrumbClickHandler) {
+            this.breadcrumbNav.removeEventListener('click', this.breadcrumbClickHandler);
+        }
+        
+        // Clear existing content
+        this.breadcrumbNav.innerHTML = '';
+        
         this.breadcrumbNav.innerHTML = items.map((item, index) => {
             const isLast = index === items.length - 1;
             const classes = isLast 
@@ -356,12 +379,29 @@ class UIManager {
             `;
         }).join('');
         
-        // Add click event listeners for breadcrumb items
-        this.breadcrumbNav.querySelectorAll('[data-breadcrumb-index]').forEach((element, index) => {
-            if (index < items.length - 1 && items[index].action) {
-                element.addEventListener('click', items[index].action);
+        // Use event delegation with single event listener
+        this.breadcrumbClickHandler = (e) => {
+            const target = e.target.closest('[data-breadcrumb-index]');
+            if (!target) return;
+            
+            const index = parseInt(target.getAttribute('data-breadcrumb-index'));
+            const item = items[index];
+            
+            // Only handle clickable items (not the last one)
+            if (index < items.length - 1 && item && item.action) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                try {
+                    item.action();
+                } catch (error) {
+                    console.error('Breadcrumb navigation error:', error);
+                }
             }
-        });
+        };
+        
+        // Add single event listener using delegation
+        this.breadcrumbNav.addEventListener('click', this.breadcrumbClickHandler);
     }
 
     // ==================== MODAL MANAGEMENT ====================
@@ -552,7 +592,7 @@ class UIManager {
         
         this.clientsList.innerHTML = clients.map(client => `
             <div class="client-card bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700" 
-                 onclick="window.laliApp.ui.navigateToApplications(${JSON.stringify(client).replace(/"/g, '&quot;')}); window.laliApp.ui.showToast('Loading applications for ${client.client_name}...', 'info', 2000);">
+                 onclick="window.laliApp.ui.navigateToApplications(${JSON.stringify(client).replace(/"/g, '&quot;')});">
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${this.escapeHtml(client.client_name)}</h3>
@@ -560,13 +600,13 @@ class UIManager {
                     </div>
                     <div class="flex space-x-3">
                         ${permissions.canUpdate ? `
-                            <button onclick="event.stopPropagation(); window.laliApp.editClient(${client.id}); window.laliApp.ui.showToast('Opening client editor...', 'info', 2000);" 
+                            <button onclick="event.stopPropagation(); window.laliApp.editClient(${client.id});" 
                                     class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-2 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Edit Client">
                                 <i class="fas fa-edit text-lg"></i>
                             </button>
                         ` : ''}
                         ${permissions.canDelete ? `
-                            <button onclick="event.stopPropagation(); if(confirm('Are you sure you want to delete this client?')) { window.laliApp.deleteClient(${client.id}); window.laliApp.ui.showToast('Client deleted successfully', 'success'); }" 
+                            <button onclick="event.stopPropagation(); if(confirm('Are you sure you want to delete this client?')) { window.laliApp.deleteClient(${client.id}); }" 
                                     class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Client">
                                 <i class="fas fa-trash text-lg"></i>
                             </button>
@@ -1184,6 +1224,36 @@ class UIManager {
         }, duration);
     }
 
+    // ==================== STATE MANAGEMENT ====================
+    
+    /**
+     * Reset UI state after tab visibility change
+     */
+    resetNavigationState() {
+        this.isNavigating = false;
+        
+        // Clear any pending navigation timeouts
+        if (this.navigationTimeout) {
+            clearTimeout(this.navigationTimeout);
+            this.navigationTimeout = null;
+        }
+        
+        // Clear any pending hide loading timeouts
+        if (this.hideLoadingTimeout) {
+            clearTimeout(this.hideLoadingTimeout);
+            this.hideLoadingTimeout = null;
+        }
+        
+        // Force hide any lingering loading overlay
+        this.hideLoading(true);
+        
+        // Remove breadcrumb event listener to prevent conflicts
+        if (this.breadcrumbClickHandler && this.breadcrumbNav) {
+            this.breadcrumbNav.removeEventListener('click', this.breadcrumbClickHandler);
+            this.breadcrumbClickHandler = null;
+        }
+    }
+    
     // ==================== EVENT CALLBACKS ====================
     // These methods should be overridden by the main app
 
