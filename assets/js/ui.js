@@ -153,6 +153,7 @@ class UIManager {
      * @param {string} message - Loading message
      */
     showLoading(message = 'Loading...') {
+        console.log('🔄 showLoading called:', message);
         // Always show loading, even if already loading (update message)
         this.isLoading = true;
         this.loadingStartTime = Date.now();
@@ -161,7 +162,13 @@ class UIManager {
             if (loadingText) {
                 loadingText.textContent = message;
             }
+            // Reset all styles and show overlay
             this.loadingOverlay.classList.remove('hidden');
+            this.loadingOverlay.style.display = 'flex';
+            this.loadingOverlay.style.visibility = 'visible';
+            this.loadingOverlay.style.opacity = '1';
+            this.loadingOverlay.style.zIndex = '50';
+            console.log('✅ Loading overlay displayed with reset styles');
         } else {
             console.warn('Loading overlay element not found');
         }
@@ -172,6 +179,7 @@ class UIManager {
      * @param {boolean} force - Force hide even if loading was started recently
      */
     hideLoading(force = false) {
+        console.log('🔄 hideLoading called, force:', force);
         // Clear any pending hide timeout
         if (this.hideLoadingTimeout) {
             clearTimeout(this.hideLoadingTimeout);
@@ -182,6 +190,11 @@ class UIManager {
         this.loadingStartTime = null;
         if (this.loadingOverlay) {
             this.loadingOverlay.classList.add('hidden');
+            this.loadingOverlay.style.display = 'none';
+            this.loadingOverlay.style.visibility = 'hidden';
+            this.loadingOverlay.style.opacity = '0';
+            this.loadingOverlay.style.zIndex = '-1';
+            console.log('✅ Loading overlay hidden with multiple methods');
         } else {
             console.warn('Loading overlay element not found');
         }

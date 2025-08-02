@@ -256,31 +256,100 @@ class LaliLinkApp {
             this.isPageVisible = false;
             this.wasPageHidden = true;
             this.lastHiddenTime = Date.now();
+            console.log('🙈 Tab hidden - current loading state:', this.ui?.isLoading || false);
         } else {
             this.isPageVisible = true;
-            // Check loading overlay status and force hide if visible
-            const loadingOverlay = document.querySelector('.loading-overlay');
-            if (loadingOverlay && !loadingOverlay.classList.contains('hidden') && this.ui) {
-                // Force hide loading immediately when returning from tab
-                this.ui.isLoading = false;
-                this.ui.loadingStartTime = null;
-                loadingOverlay.classList.add('hidden');
+            console.log('🔄 Tab became visible - checking loading overlay');
+            
+            // Nuclear approach: completely remove loading overlay from DOM
+            const loadingOverlay = document.querySelector('#loadingOverlay');
+            if (loadingOverlay) {
+                const wasVisible = !loadingOverlay.classList.contains('hidden');
+                console.log('📱 Loading overlay found, was visible:', wasVisible);
+                
+                // Nuclear option: temporarily remove from DOM
+                const parent = loadingOverlay.parentNode;
+                if (parent && wasVisible) {
+                    parent.removeChild(loadingOverlay);
+                    console.log('💥 Loading overlay removed from DOM');
+                    
+                    // Re-add it after a short delay but hidden
+                    setTimeout(() => {
+                        loadingOverlay.classList.add('hidden');
+                        loadingOverlay.style.display = 'none';
+                        loadingOverlay.style.visibility = 'hidden';
+                        loadingOverlay.style.opacity = '0';
+                        loadingOverlay.style.zIndex = '-1';
+                        parent.appendChild(loadingOverlay);
+                        console.log('🔄 Loading overlay re-added but hidden');
+                    }, 100);
+                } else {
+                    // Standard hiding if not visible
+                    loadingOverlay.classList.add('hidden');
+                    loadingOverlay.style.display = 'none';
+                    loadingOverlay.style.visibility = 'hidden';
+                    loadingOverlay.style.opacity = '0';
+                    loadingOverlay.style.zIndex = '-1';
+                }
             }
             
-            // Reset UI navigation state when returning from other tabs
-            setTimeout(() => {
+            // Reset UI state immediately
+            if (this.ui) {
+                console.log('🔧 Resetting UI state');
+                this.ui.isLoading = false;
+                this.ui.loadingStartTime = null;
+                this.ui.isNavigating = false;
+                
+                // Clear any pending timeouts
+                if (this.ui.hideLoadingTimeout) {
+                    clearTimeout(this.ui.hideLoadingTimeout);
+                    this.ui.hideLoadingTimeout = null;
+                }
+                if (this.ui.navigationTimeout) {
+                    clearTimeout(this.ui.navigationTimeout);
+                    this.ui.navigationTimeout = null;
+                }
+            }
+            
+            // Additional cleanup after a short delay
+             setTimeout(() => {
+                 const overlay = document.querySelector('#loadingOverlay');
+                 if (overlay && !overlay.classList.contains('hidden')) {
+                     console.log('🚨 Loading overlay still visible, applying nuclear cleanup');
+                     const parent = overlay.parentNode;
+                     if (parent) {
+                         parent.removeChild(overlay);
+                         console.log('💥 Nuclear cleanup: overlay removed from DOM');
+                         
+                         // Re-add it hidden
+                         setTimeout(() => {
+                             overlay.classList.add('hidden');
+                             overlay.style.display = 'none';
+                             overlay.style.visibility = 'hidden';
+                             overlay.style.opacity = '0';
+                             overlay.style.zIndex = '-1';
+                             parent.appendChild(overlay);
+                             console.log('🔄 Nuclear cleanup: overlay re-added but hidden');
+                         }, 50);
+                     }
+                 } else if (overlay) {
+                     // Standard cleanup if already hidden
+                     overlay.classList.add('hidden');
+                     overlay.style.display = 'none';
+                     overlay.style.visibility = 'hidden';
+                     overlay.style.opacity = '0';
+                     overlay.style.zIndex = '-1';
+                     console.log('🔄 Standard additional cleanup completed');
+                 }
+                
                 if (this.ui && typeof this.ui.resetNavigationState === 'function') {
                     try {
                         this.ui.resetNavigationState();
                     } catch (error) {
                         console.warn('Failed to reset navigation state:', error);
-                        // Fallback: manually reset navigation flag
-                        if (this.ui) {
-                            this.ui.isNavigating = false;
-                        }
                     }
                 }
-            }, 50);
+            }, 100);
             
             // Reset flag after a longer delay to prevent auth state triggers when returning from other tabs
             setTimeout(() => {
