@@ -19,11 +19,25 @@ class LaliLinkApp {
         this.isInitialized = false;
         this.sessionCheckInterval = null;
         
+        // Submission flags to prevent duplicates
+        this.isSubmittingClient = false;
+        this.isSubmittingApplication = false;
+        this.isSubmittingCredential = false;
+        
+        // Flag untuk melacak apakah ini adalah login pertama kali
+        this.isFirstLogin = true;
+        
+        // Flag untuk melacak visibility state
+        this.isPageVisible = true;
+        this.wasPageHidden = false;
+        this.lastHiddenTime = null;
+        
         // Bind methods to preserve context
         this.handleAuthStateChange = this.handleAuthStateChange.bind(this);
         this.checkSession = this.checkSession.bind(this);
         this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
         
+<<<<<<< HEAD
         // Track form submission state to prevent double submissions
         this.isSubmitting = false;
         
@@ -50,6 +64,10 @@ class LaliLinkApp {
         this.pendingOperations = new Set(); // Track pending operations
         this.isTabSwitching = false;
         this.pendingOpsBeforeHidden = 0; // Track operations count before tab hidden
+=======
+        // Setup visibility change listener
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
     }
 
     /**
@@ -138,6 +156,12 @@ class LaliLinkApp {
         
         // Set up auth state change listener
         this.auth.addAuthStateListener((event, session) => this.handleAuthStateChange(event, session));
+<<<<<<< HEAD
+=======
+        
+        // Initialize auth manager (this will set up the Supabase listener internally)
+        await this.auth.init();
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
     }
 
     /**
@@ -179,6 +203,7 @@ class LaliLinkApp {
      * Setup form handlers
      */
     setupFormHandlers() {
+<<<<<<< HEAD
         // Prevent duplicate event listener setup
         if (this.eventListenersSetup) {
             console.log('Form handlers already setup, skipping...');
@@ -234,6 +259,44 @@ class LaliLinkApp {
             this.eventListenersSetup = true;
             console.log('Form handlers setup completed');
         }, 100);
+=======
+        // Auth forms
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        
+        if (loginForm) {
+            // Remove existing listeners to prevent duplicates
+            loginForm.removeEventListener('submit', this.handleLogin);
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        }
+        
+        if (registerForm) {
+            registerForm.removeEventListener('submit', this.handleRegister);
+            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+        }
+        
+        // Entity forms
+        if (this.ui.clientForm) {
+            // Remove existing listeners to prevent duplicates
+            this.ui.clientForm.removeEventListener('submit', this.handleClientSubmit);
+            this.ui.clientForm.addEventListener('submit', (e) => this.handleClientSubmit(e));
+        }
+        
+        if (this.ui.applicationForm) {
+            this.ui.applicationForm.removeEventListener('submit', this.handleApplicationSubmit);
+            this.ui.applicationForm.addEventListener('submit', (e) => this.handleApplicationSubmit(e));
+        }
+        
+        if (this.ui.credentialForm) {
+            this.ui.credentialForm.removeEventListener('submit', this.handleCredentialSubmit);
+            this.ui.credentialForm.addEventListener('submit', (e) => this.handleCredentialSubmit(e));
+        }
+        
+        if (this.ui.userForm) {
+            this.ui.userForm.removeEventListener('submit', this.handleUserSubmit);
+            this.ui.userForm.addEventListener('submit', (e) => this.handleUserSubmit(e));
+        }
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
     }
 
     /**
@@ -321,6 +384,7 @@ class LaliLinkApp {
         try {
             const { data: { session } } = await this.supabase.auth.getSession();
             if (session) {
+<<<<<<< HEAD
                 // Only set isInitialLogin to true if this is truly the first load
                 // Check if we have any saved navigation state - if not, it's initial login
                 const hasNavigationState = localStorage.getItem('lastView') || 
@@ -329,6 +393,10 @@ class LaliLinkApp {
                 
                 this.isInitialLogin = !hasNavigationState;
                 await this.handleAuthStateChange('SIGNED_IN', session);
+=======
+                // Gunakan event khusus untuk session yang sudah ada (bukan login baru)
+                await this.handleAuthStateChange('SESSION_RESTORED', session);
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
             } else {
                 this.ui.showAuth();
             }
@@ -340,6 +408,7 @@ class LaliLinkApp {
 
     /**
      * Handle page visibility changes
+<<<<<<< HEAD
      * Save current navigation state without triggering navigation
      */
     handleVisibilityChange() {
@@ -410,6 +479,116 @@ class LaliLinkApp {
         }
     }
 
+=======
+     */
+    handleVisibilityChange() {
+        if (document.hidden) {
+            this.isPageVisible = false;
+            this.wasPageHidden = true;
+            this.lastHiddenTime = Date.now();
+            console.log('🙈 Tab hidden - current loading state:', this.ui?.isLoading || false);
+        } else {
+            this.isPageVisible = true;
+            console.log('🔄 Tab became visible - checking loading overlay');
+            
+            // Nuclear approach: completely remove loading overlay from DOM
+            const loadingOverlay = document.querySelector('#loadingOverlay');
+            if (loadingOverlay) {
+                const wasVisible = !loadingOverlay.classList.contains('hidden');
+                console.log('📱 Loading overlay found, was visible:', wasVisible);
+                
+                // Nuclear option: temporarily remove from DOM
+                const parent = loadingOverlay.parentNode;
+                if (parent && wasVisible) {
+                    parent.removeChild(loadingOverlay);
+                    console.log('💥 Loading overlay removed from DOM');
+                    
+                    // Re-add it after a short delay but hidden
+                    setTimeout(() => {
+                        loadingOverlay.classList.add('hidden');
+                        loadingOverlay.style.display = 'none';
+                        loadingOverlay.style.visibility = 'hidden';
+                        loadingOverlay.style.opacity = '0';
+                        loadingOverlay.style.zIndex = '-1';
+                        parent.appendChild(loadingOverlay);
+                        console.log('🔄 Loading overlay re-added but hidden');
+                    }, 100);
+                } else {
+                    // Standard hiding if not visible
+                    loadingOverlay.classList.add('hidden');
+                    loadingOverlay.style.display = 'none';
+                    loadingOverlay.style.visibility = 'hidden';
+                    loadingOverlay.style.opacity = '0';
+                    loadingOverlay.style.zIndex = '-1';
+                }
+            }
+            
+            // Reset UI state immediately
+            if (this.ui) {
+                console.log('🔧 Resetting UI state');
+                this.ui.isLoading = false;
+                this.ui.loadingStartTime = null;
+                this.ui.isNavigating = false;
+                
+                // Clear any pending timeouts
+                if (this.ui.hideLoadingTimeout) {
+                    clearTimeout(this.ui.hideLoadingTimeout);
+                    this.ui.hideLoadingTimeout = null;
+                }
+                if (this.ui.navigationTimeout) {
+                    clearTimeout(this.ui.navigationTimeout);
+                    this.ui.navigationTimeout = null;
+                }
+            }
+            
+            // Additional cleanup after a short delay
+             setTimeout(() => {
+                 const overlay = document.querySelector('#loadingOverlay');
+                 if (overlay && !overlay.classList.contains('hidden')) {
+                     console.log('🚨 Loading overlay still visible, applying nuclear cleanup');
+                     const parent = overlay.parentNode;
+                     if (parent) {
+                         parent.removeChild(overlay);
+                         console.log('💥 Nuclear cleanup: overlay removed from DOM');
+                         
+                         // Re-add it hidden
+                         setTimeout(() => {
+                             overlay.classList.add('hidden');
+                             overlay.style.display = 'none';
+                             overlay.style.visibility = 'hidden';
+                             overlay.style.opacity = '0';
+                             overlay.style.zIndex = '-1';
+                             parent.appendChild(overlay);
+                             console.log('🔄 Nuclear cleanup: overlay re-added but hidden');
+                         }, 50);
+                     }
+                 } else if (overlay) {
+                     // Standard cleanup if already hidden
+                     overlay.classList.add('hidden');
+                     overlay.style.display = 'none';
+                     overlay.style.visibility = 'hidden';
+                     overlay.style.opacity = '0';
+                     overlay.style.zIndex = '-1';
+                     console.log('🔄 Standard additional cleanup completed');
+                 }
+                
+                if (this.ui && typeof this.ui.resetNavigationState === 'function') {
+                    try {
+                        this.ui.resetNavigationState();
+                    } catch (error) {
+                        console.warn('Failed to reset navigation state:', error);
+                    }
+                }
+            }, 100);
+            
+            // Reset flag after a longer delay to prevent auth state triggers when returning from other tabs
+            setTimeout(() => {
+                this.wasPageHidden = false;
+            }, 2000);
+        }
+    }
+    
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
     /**
      * Handle authentication state changes
      * @param {string} event - Auth event
@@ -419,8 +598,12 @@ class LaliLinkApp {
         console.log('Main app handling auth state change:', event, session ? 'with session' : 'no session');
         
         try {
+<<<<<<< HEAD
             if (event === 'SIGNED_IN' && session) {
                 console.log('Processing SIGNED_IN in main app');
+=======
+            if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SESSION_RESTORED') && session) {
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
                 this.currentUser = session.user;
                 
                 // Load user profile
@@ -435,6 +618,7 @@ class LaliLinkApp {
                 console.log('Showing app container...');
                 this.ui.showApp();
                 
+<<<<<<< HEAD
                 // Add small delay to ensure DOM is fully rendered
                 setTimeout(() => {
                     console.log('Setting up button handlers...');
@@ -460,8 +644,50 @@ class LaliLinkApp {
                             await this.loadApplications(client);
                         } catch (e) {
                             console.warn('Failed to restore applications view:', e);
+=======
+                // Hanya lakukan navigasi jika bukan kembali dari tab tersembunyi dan tidak dalam waktu 5 detik setelah kembali dari tab lain
+                const timeSinceHidden = this.lastHiddenTime ? Date.now() - this.lastHiddenTime : Infinity;
+                if (!this.wasPageHidden && timeSinceHidden > 5000) {
+                    // Add small delay to ensure UI is fully ready
+                    setTimeout(async () => {
+                        // Restore last visited page or default to clients view
+                        const lastView = localStorage.getItem('lastView');
+                        const lastClient = localStorage.getItem('lastClient');
+                        const lastApplication = localStorage.getItem('lastApplication');
+                        
+                        if (lastView === 'applications' && lastClient) {
+                            try {
+                                const client = JSON.parse(lastClient);
+                                this.ui.navigateToApplications(client);
+                                await this.loadApplications(client);
+                            } catch (e) {
+                                console.warn('Failed to restore applications view:', e);
+                                this.ui.showClientsView();
+                                await this.loadClients();
+                            }
+                        } else if (lastView === 'credentials' && lastApplication) {
+                            try {
+                                const application = JSON.parse(lastApplication);
+                                const client = lastClient ? JSON.parse(lastClient) : null;
+                                if (client) {
+                                    this.ui.currentClient = client;
+                                    this.ui.navigateToCredentials(application);
+                                    await this.loadCredentials(application);
+                                } else {
+                                    this.ui.showClientsView();
+                                    await this.loadClients();
+                                }
+                            } catch (e) {
+                                console.warn('Failed to restore credentials view:', e);
+                                this.ui.showClientsView();
+                                await this.loadClients();
+                            }
+                        } else {
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
                             this.ui.showClientsView();
+                            await this.loadClients();
                         }
+<<<<<<< HEAD
                     } else if (lastView === 'credentials' && lastApplication) {
                         try {
                             const application = JSON.parse(lastApplication);
@@ -493,11 +719,28 @@ class LaliLinkApp {
                 }
                 
                 console.log('SIGNED_IN processing completed');
+=======
+                    }, 100);
+                } else {
+                    // Jika dari tab tersembunyi, langsung load clients tanpa navigasi
+                    this.ui.showClientsView();
+                    await this.loadClients();
+                }
+                
+                // Hanya tampilkan toast welcome pada login pertama kali (bukan token refresh atau saat kembali dari tab tersembunyi)
+                if (this.isFirstLogin && event === 'SIGNED_IN' && !this.wasPageHidden) {
+                    this.ui.showToast('Welcome to LaliLink!', 'success');
+                    this.isFirstLogin = false;
+                }
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
             } else if (event === 'SIGNED_OUT') {
                 console.log('Processing SIGNED_OUT in main app');
                 this.currentUser = null;
                 this.userProfile = null;
                 this.userPermissions = null;
+                
+                // Reset flag untuk login berikutnya
+                this.isFirstLogin = true;
                 
                 // Clear sensitive data
                 if (this.database) {
@@ -1131,12 +1374,20 @@ class LaliLinkApp {
         this.lastSubmissionTime = currentTime;
         
         const form = e.target;
+<<<<<<< HEAD
         const submitBtn = form.querySelector('button[type="submit"]');
         
         // Disable submit button immediately
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Saving...';
+=======
+        
+        // Prevent multiple submissions
+        if (this.isSubmittingClient) {
+            console.log('Client submission already in progress, ignoring duplicate request');
+            return;
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
         }
         
         const clientData = {
@@ -1151,6 +1402,14 @@ class LaliLinkApp {
         console.log('Client data:', clientData, 'Mode:', mode);
         
         try {
+            this.isSubmittingClient = true;
+            
+            // Disable form submit button
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+            
             this.ui.showLoading(mode === 'create' ? 'Creating client...' : 'Updating client...');
             
             let result;
@@ -1179,6 +1438,14 @@ class LaliLinkApp {
             console.error('Failed to save client:', error);
             this.ui.showToast('Failed to save client', 'error');
         } finally {
+            this.isSubmittingClient = false;
+            
+            // Re-enable form submit button
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+            
             this.ui.hideLoading();
             this.isSubmitting = false;
             
@@ -1358,10 +1625,16 @@ class LaliLinkApp {
                 console.log('Reloading credentials for app:', appId);
                 await this.ui.loadCredentialsForApp(appId);
                 
-                // Also reload applications view if we're in applications view
+                // Handle navigation based on current view
                 if (this.ui.currentView === 'applications') {
                     console.log('Reloading applications view after credential save');
                     await this.loadApplications(this.ui.currentClient);
+                } else if (this.ui.currentView === 'credentials') {
+                    console.log('Staying in credentials view after credential save');
+                    // Reload credentials for the current application
+                    if (this.ui.currentApplication) {
+                        await this.loadCredentials(this.ui.currentApplication);
+                    }
                 }
             }
             
@@ -1811,6 +2084,7 @@ class LaliLinkApp {
             clearInterval(this.sessionCheckInterval);
         }
         
+<<<<<<< HEAD
         // Clear loading state monitoring
         if (this.loadingStateChecker) {
             clearInterval(this.loadingStateChecker);
@@ -1819,6 +2093,10 @@ class LaliLinkApp {
         // Remove event listeners
         document.removeEventListener('visibilitychange', this.handleVisibilityChange);
         document.removeEventListener('visibilitychange', this.pageVisibilityHandler);
+=======
+        // Remove visibility change listener
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+>>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
         
         // Clear caches
         if (this.database) {

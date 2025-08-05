@@ -516,16 +516,8 @@
     <script src="assets/js/main.js"></script>
     
     <script>
-        // Initialize app when DOM is loaded
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                window.app = new LaliLinkApp();
-                await window.app.init();
-            } catch (error) {
-                console.error('Failed to initialize app:', error);
-                alert('Failed to initialize application. Please refresh the page.');
-            }
-        });
+        // App initialization is handled in main.js
+        // No need to initialize here to avoid duplicate instances
     </script>
 </body>
 </html>
