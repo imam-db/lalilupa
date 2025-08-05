@@ -172,27 +172,17 @@ class UIManager {
      * @param {string} message - Loading message
      */
     showLoading(message = 'Loading...') {
-<<<<<<< HEAD
-        console.log('showLoading called:', message);
         this.isLoading = true;
         
         // Notify main app about loading start
         if (window.laliApp) {
             window.laliApp.loadingStartTime = Date.now();
         }
-        
-=======
-        console.log('🔄 showLoading called:', message);
-        // Always show loading, even if already loading (update message)
-        this.isLoading = true;
-        this.loadingStartTime = Date.now();
->>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
         if (this.loadingOverlay) {
             const loadingText = this.loadingOverlay.querySelector('.loading-text');
             if (loadingText) {
                 loadingText.textContent = message;
             }
-<<<<<<< HEAD
             
             // Simple and reliable show
             this.loadingOverlay.classList.remove('hidden', 'fade-out');
@@ -211,17 +201,6 @@ class UIManager {
                     }
                 }
             }, 3000);
-            
-            console.log('Loading overlay shown');
-=======
-            // Reset all styles and show overlay
-            this.loadingOverlay.classList.remove('hidden');
-            this.loadingOverlay.style.display = 'flex';
-            this.loadingOverlay.style.visibility = 'visible';
-            this.loadingOverlay.style.opacity = '1';
-            this.loadingOverlay.style.zIndex = '50';
-            console.log('✅ Loading overlay displayed with reset styles');
->>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
         } else {
             console.warn('Loading overlay element not found');
         }
@@ -231,43 +210,19 @@ class UIManager {
      * Hide loading overlay
      * @param {boolean} force - Force hide even if loading was started recently
      */
-<<<<<<< HEAD
     hideLoading() {
-        console.log('hideLoading called');
         this.isLoading = false;
         
         // Reset loading start time in main app
         if (window.laliApp) {
             window.laliApp.loadingStartTime = null;
         }
-        
-=======
-    hideLoading(force = false) {
-        console.log('🔄 hideLoading called, force:', force);
-        // Clear any pending hide timeout
-        if (this.hideLoadingTimeout) {
-            clearTimeout(this.hideLoadingTimeout);
-            this.hideLoadingTimeout = null;
-        }
-        
-        this.isLoading = false;
-        this.loadingStartTime = null;
->>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
         if (this.loadingOverlay) {
             // Simple and reliable hide - immediately add hidden class
             this.loadingOverlay.classList.add('hidden');
-<<<<<<< HEAD
             this.loadingOverlay.classList.remove('fade-out');
             this.loadingOverlay.dataset.clickable = 'false';
             this.loadingOverlay.style.cursor = 'default';
-            console.log('Loading overlay hidden');
-=======
-            this.loadingOverlay.style.display = 'none';
-            this.loadingOverlay.style.visibility = 'hidden';
-            this.loadingOverlay.style.opacity = '0';
-            this.loadingOverlay.style.zIndex = '-1';
-            console.log('✅ Loading overlay hidden with multiple methods');
->>>>>>> e0255eeb3cb79d585a373277739e69901b0dda79
         } else {
             console.warn('Loading overlay element not found');
         }
