@@ -23,7 +23,8 @@ class AuthManager {
             await this.getCurrentUser();
             
             // Set up auth state listener
-            this.supabase.auth.onAuthStateChange(this.onAuthStateChange);
+            const { data: { subscription } } = this.supabase.auth.onAuthStateChange(this.onAuthStateChange);
+            this.authSubscription = subscription;
             
             // Set up periodic session check
             this.startSessionCheck();
@@ -47,14 +48,19 @@ class AuthManager {
                 throw new Error('Email dan password harus diisi');
             }
 
+            console.log('Attempting to sign in with email:', email);
+
             const { data, error } = await this.supabase.auth.signInWithPassword({
                 email: email.trim().toLowerCase(),
                 password: password
             });
 
             if (error) {
+                console.error('Supabase auth error:', error);
                 throw error;
             }
+
+            console.log('Sign in successful:', data);
 
             // Load user profile after successful login
             if (data.user) {
@@ -65,10 +71,19 @@ class AuthManager {
             return { data, error: null };
         } catch (error) {
             console.error('Sign in failed:', error);
-            return { 
-                data: null, 
+            
+            // Extract meaningful error message
+            let errorMessage = 'Login failed';
+            if (error.message) {
+                errorMessage = this.getLocalizedErrorMessage(error.message);
+            } else if (error.error_description) {
+                errorMessage = this.getLocalizedErrorMessage(error.error_description);
+            }
+            
+            return {
+                data: null,
                 error: {
-                    message: this.getLocalizedErrorMessage(error.message)
+                    message: errorMessage
                 }
             };
         }
@@ -121,21 +136,33 @@ class AuthManager {
      */
     async signOut() {
         try {
+            console.log('Attempting to sign out...');
+            
             const { error } = await this.supabase.auth.signOut();
             
-            if (!error) {
-                this.user = null;
-                this.userProfile = null;
-                this.stopSessionCheck();
-                
-                // Clear any cached data
-                this.clearUserData();
+            if (error) {
+                console.error('Supabase signOut error:', error);
+                throw error;
             }
+            
+            console.log('Sign out successful');
+            
+            // Clear user data
+            this.user = null;
+            this.userProfile = null;
+            this.stopSessionCheck();
+            
+            // Clear any cached data
+            this.clearUserData();
 
-            return { error };
+            return { error: null };
         } catch (error) {
             console.error('Sign out failed:', error);
-            return { error };
+            return {
+                error: {
+                    message: 'Gagal logout, coba lagi'
+                }
+            };
         }
     }
 
@@ -423,17 +450,21 @@ class AuthManager {
      * @param {Object} session - Session data
      */
     async onAuthStateChange(event, session) {
-        console.log('Auth state changed:', event);
+        console.log('Auth state changed:', event, session ? 'with session' : 'no session');
         
         try {
             if (event === 'SIGNED_IN' && session?.user) {
+                console.log('Processing SIGNED_IN event');
                 this.user = session.user;
                 await this.loadUserProfile();
+                console.log('User profile loaded, notifying listeners');
             } else if (event === 'SIGNED_OUT') {
+                console.log('Processing SIGNED_OUT event');
                 this.user = null;
                 this.userProfile = null;
                 this.clearUserData();
             } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+                console.log('Processing TOKEN_REFRESHED event');
                 this.user = session.user;
                 // Profile should still be valid, but refresh if needed
                 if (!this.userProfile) {
@@ -442,6 +473,7 @@ class AuthManager {
             }
 
             // Notify listeners
+            console.log('Notifying auth state listeners');
             this.notifyAuthStateListeners(event, session);
         } catch (error) {
             console.error('Error handling auth state change:', error);
@@ -530,10 +562,29 @@ class AuthManager {
             'Password should be at least 6 characters': 'Password minimal 6 karakter',
             'Invalid email': 'Format email tidak valid',
             'Network error': 'Koneksi bermasalah, coba lagi',
-            'Too many requests': 'Terlalu banyak percobaan, coba lagi nanti'
+            'Too many requests': 'Terlalu banyak percobaan, coba lagi nanti',
+            'User not found': 'User tidak ditemukan',
+            'Invalid credentials': 'Email atau password salah',
+            'Email rate limit exceeded': 'Terlalu banyak percobaan login, coba lagi nanti',
+            'Signup disabled': 'Pendaftaran tidak diizinkan',
+            'Invalid request': 'Permintaan tidak valid'
         };
 
-        return errorMap[errorMessage] || errorMessage || 'Terjadi kesalahan';
+        // Handle common error patterns
+        if (errorMessage && typeof errorMessage === 'string') {
+            const lowerMessage = errorMessage.toLowerCase();
+            if (lowerMessage.includes('invalid') && lowerMessage.includes('credentials')) {
+                return 'Email atau password salah';
+            }
+            if (lowerMessage.includes('network') || lowerMessage.includes('fetch')) {
+                return 'Koneksi bermasalah, coba lagi';
+            }
+            if (lowerMessage.includes('rate limit') || lowerMessage.includes('too many')) {
+                return 'Terlalu banyak percobaan, coba lagi nanti';
+            }
+        }
+
+        return errorMap[errorMessage] || errorMessage || 'Terjadi kesalahan saat login';
     }
 
     /**

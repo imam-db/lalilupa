@@ -22,6 +22,34 @@ class LaliLinkApp {
         // Bind methods to preserve context
         this.handleAuthStateChange = this.handleAuthStateChange.bind(this);
         this.checkSession = this.checkSession.bind(this);
+        this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+        
+        // Track form submission state to prevent double submissions
+        this.isSubmitting = false;
+        
+        // Track if this is initial login to prevent unwanted navigation on auth state changes
+        this.isInitialLogin = false;
+        
+        // Debounce mechanism for form submissions
+        this.lastSubmissionTime = 0;
+        this.submissionDebounceMs = 1000; // 1 second debounce
+        
+        // Flag to prevent duplicate event listener setup
+        this.eventListenersSetup = false;
+        this.uiEventHandlersSetup = false;
+        this.buttonHandlersSetup = false;
+        
+        // Page visibility handling for loading state
+        this.pageVisibilityHandler = this.handlePageVisibilityChange.bind(this);
+        this.wasLoadingBeforeHidden = false;
+        
+        // Intelligent loading state management
+        this.loadingStateChecker = null;
+        this.maxLoadingDuration = 5000; // 5 seconds max loading time (reduced)
+        this.loadingStartTime = null;
+        this.pendingOperations = new Set(); // Track pending operations
+        this.isTabSwitching = false;
+        this.pendingOpsBeforeHidden = 0; // Track operations count before tab hidden
     }
 
     /**
@@ -52,6 +80,9 @@ class LaliLinkApp {
             
             // Start session monitoring
             this.startSessionMonitoring();
+            
+            // Start loading state monitoring
+            this.startLoadingStateMonitoring();
             
             this.isInitialized = true;
             this.ui.hideLoading();
@@ -99,22 +130,25 @@ class LaliLinkApp {
         // Initialize other managers (UI already initialized in init())
         this.security = new SecurityManager();
         this.clipboard = new ClipboardManager();
-        this.auth = new AuthManager(this.supabase, this.config);
+        this.auth = new AuthManager(this.supabase);
         this.database = new DatabaseManager(this.supabase);
+        
+        // Initialize auth manager first
+        await this.auth.init();
         
         // Set up auth state change listener
         this.auth.addAuthStateListener((event, session) => this.handleAuthStateChange(event, session));
-        
-        // Set up Supabase auth state listener
-        this.supabase.auth.onAuthStateChange((event, session) => {
-            this.auth.onAuthStateChange(event, session);
-        });
     }
 
     /**
      * Setup UI event handlers
      */
     setupUIEventHandlers() {
+        // Prevent duplicate setup
+        if (this.uiEventHandlersSetup) {
+            return;
+        }
+        
         // Override UI callback methods
         this.ui.onShowClients = () => this.loadClients();
         this.ui.onNavigateToApplications = (client) => this.loadApplications(client);
@@ -126,81 +160,154 @@ class LaliLinkApp {
         // Initialize dark theme
         this.ui.initializeDarkTheme();
         
+        // Setup visibility change handler for navigation state
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        
+        // Setup page visibility handler for loading state management
+        document.addEventListener('visibilitychange', this.pageVisibilityHandler);
+        
         // Form submissions
         this.setupFormHandlers();
         
         // Button click handlers
         this.setupButtonHandlers();
+        
+        this.uiEventHandlersSetup = true;
     }
 
     /**
      * Setup form handlers
      */
     setupFormHandlers() {
-        // Auth forms
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-        
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        // Prevent duplicate event listener setup
+        if (this.eventListenersSetup) {
+            console.log('Form handlers already setup, skipping...');
+            return;
         }
         
-        if (registerForm) {
-            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
-        }
+        console.log('Setting up form handlers...');
         
-        // Entity forms
-        if (this.ui.clientForm) {
-            this.ui.clientForm.addEventListener('submit', (e) => this.handleClientSubmit(e));
-        }
-        
-        if (this.ui.applicationForm) {
-            this.ui.applicationForm.addEventListener('submit', (e) => this.handleApplicationSubmit(e));
-        }
-        
-        if (this.ui.credentialForm) {
-            this.ui.credentialForm.addEventListener('submit', (e) => this.handleCredentialSubmit(e));
-        }
-        
-        if (this.ui.userForm) {
-            this.ui.userForm.addEventListener('submit', (e) => this.handleUserSubmit(e));
-        }
+        // Use setTimeout to ensure DOM is fully ready
+        setTimeout(() => {
+            // Auth forms
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            
+            if (loginForm && !loginForm.dataset.handlerAttached) {
+                loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+                loginForm.dataset.handlerAttached = 'true';
+                console.log('Login form handler attached');
+            }
+            
+            if (registerForm && !registerForm.dataset.handlerAttached) {
+                registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+                registerForm.dataset.handlerAttached = 'true';
+                console.log('Register form handler attached');
+            }
+            
+            // Entity forms - use dataset flag to prevent double attachment
+            if (this.ui.clientForm && !this.ui.clientForm.dataset.handlerAttached) {
+                this.ui.clientForm.addEventListener('submit', (e) => this.handleClientSubmit(e));
+                this.ui.clientForm.dataset.handlerAttached = 'true';
+                console.log('Client form handler attached');
+            }
+            
+            if (this.ui.applicationForm && !this.ui.applicationForm.dataset.handlerAttached) {
+                this.ui.applicationForm.addEventListener('submit', (e) => this.handleApplicationSubmit(e));
+                this.ui.applicationForm.dataset.handlerAttached = 'true';
+                console.log('Application form handler attached');
+            }
+            
+            if (this.ui.credentialForm && !this.ui.credentialForm.dataset.handlerAttached) {
+                this.ui.credentialForm.addEventListener('submit', (e) => this.handleCredentialSubmit(e));
+                this.ui.credentialForm.dataset.handlerAttached = 'true';
+                console.log('Credential form handler attached');
+            }
+            
+            if (this.ui.userForm && !this.ui.userForm.dataset.handlerAttached) {
+                this.ui.userForm.addEventListener('submit', (e) => this.handleUserSubmit(e));
+                this.ui.userForm.dataset.handlerAttached = 'true';
+                console.log('User form handler attached');
+            }
+            
+            // Mark event listeners as setup
+            this.eventListenersSetup = true;
+            console.log('Form handlers setup completed');
+        }, 100);
     }
 
     /**
-     * Setup button handlers
+     * Setup button handlers with retry mechanism
      */
     setupButtonHandlers() {
-        // Add buttons
-        if (this.ui.addClientBtn) {
-            this.ui.addClientBtn.addEventListener('click', () => this.showAddClientModal());
+        // Prevent duplicate setup
+        if (this.buttonHandlersSetup) {
+            console.log('Button handlers already setup, skipping...');
+            return;
         }
         
-        if (this.ui.addApplicationBtn) {
-            this.ui.addApplicationBtn.addEventListener('click', () => this.showAddApplicationModal());
-        }
+        console.log('Setting up button handlers...');
         
-        if (this.ui.addCredentialBtn) {
-            this.ui.addCredentialBtn.addEventListener('click', () => this.showAddCredentialModal());
-        }
+        // Wait for DOM to be ready and retry if elements not found
+        const setupWithRetry = (retryCount = 0) => {
+            // Re-initialize UI elements to get fresh references
+            this.ui.initializeElements();
+            
+            // Use dataset flag to prevent duplicate event listeners
+            if (this.ui.addClientBtn && !this.ui.addClientBtn.dataset.handlerAttached) {
+                this.ui.addClientBtn.addEventListener('click', () => this.showAddClientModal());
+                this.ui.addClientBtn.dataset.handlerAttached = 'true';
+                console.log('Add Client button handler attached');
+            }
+            
+            if (this.ui.addApplicationBtn && !this.ui.addApplicationBtn.dataset.handlerAttached) {
+                this.ui.addApplicationBtn.addEventListener('click', () => this.showAddApplicationModal());
+                this.ui.addApplicationBtn.dataset.handlerAttached = 'true';
+                console.log('Add Application button handler attached');
+            }
+            
+            if (this.ui.addCredentialBtn && !this.ui.addCredentialBtn.dataset.handlerAttached) {
+                this.ui.addCredentialBtn.addEventListener('click', () => this.showAddCredentialModal());
+                this.ui.addCredentialBtn.dataset.handlerAttached = 'true';
+                console.log('Add Credential button handler attached');
+            }
+            
+            // Logout button
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn && !logoutBtn.dataset.handlerAttached) {
+                logoutBtn.addEventListener('click', () => this.handleLogout());
+                logoutBtn.dataset.handlerAttached = 'true';
+                console.log('Logout button handler attached');
+            }
+            
+            // Auth toggle buttons
+            const showRegisterBtn = document.getElementById('showRegister');
+            const showLoginBtn = document.getElementById('showLogin');
+            
+            if (showRegisterBtn && !showRegisterBtn.dataset.handlerAttached) {
+                showRegisterBtn.addEventListener('click', () => this.toggleAuthForm('register'));
+                showRegisterBtn.dataset.handlerAttached = 'true';
+            }
+            
+            if (showLoginBtn && !showLoginBtn.dataset.handlerAttached) {
+                showLoginBtn.addEventListener('click', () => this.toggleAuthForm('login'));
+                showLoginBtn.dataset.handlerAttached = 'true';
+            }
+            
+            // Check if critical buttons are found
+            const criticalButtonsFound = this.ui.addClientBtn && logoutBtn;
+            
+            if (!criticalButtonsFound && retryCount < 3) {
+                console.log(`Retrying button setup (attempt ${retryCount + 1})`);
+                setTimeout(() => setupWithRetry(retryCount + 1), 100);
+                return;
+            }
+            
+            this.buttonHandlersSetup = true;
+            console.log('Button handlers setup completed');
+        };
         
-        // Logout button
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.handleLogout());
-        }
-        
-        // Auth toggle buttons
-        const showRegisterBtn = document.getElementById('showRegister');
-        const showLoginBtn = document.getElementById('showLogin');
-        
-        if (showRegisterBtn) {
-            showRegisterBtn.addEventListener('click', () => this.toggleAuthForm('register'));
-        }
-        
-        if (showLoginBtn) {
-            showLoginBtn.addEventListener('click', () => this.toggleAuthForm('login'));
-        }
+        setupWithRetry();
         
         // Password toggle will be setup when modal is opened
     }
@@ -214,6 +321,13 @@ class LaliLinkApp {
         try {
             const { data: { session } } = await this.supabase.auth.getSession();
             if (session) {
+                // Only set isInitialLogin to true if this is truly the first load
+                // Check if we have any saved navigation state - if not, it's initial login
+                const hasNavigationState = localStorage.getItem('lastView') || 
+                                          localStorage.getItem('lastClient') || 
+                                          localStorage.getItem('lastApplication');
+                
+                this.isInitialLogin = !hasNavigationState;
                 await this.handleAuthStateChange('SIGNED_IN', session);
             } else {
                 this.ui.showAuth();
@@ -225,66 +339,170 @@ class LaliLinkApp {
     }
 
     /**
+     * Handle page visibility changes
+     * Save current navigation state without triggering navigation
+     */
+    handleVisibilityChange() {
+        if (document.visibilityState === 'hidden') {
+            // Save current navigation state when tab becomes hidden
+            if (this.ui && this.ui.currentView) {
+                localStorage.setItem('lastView', this.ui.currentView);
+                
+                if (this.ui.currentClient) {
+                    localStorage.setItem('lastClient', JSON.stringify(this.ui.currentClient));
+                }
+                
+                if (this.ui.currentApplication) {
+                    localStorage.setItem('lastApplication', JSON.stringify(this.ui.currentApplication));
+                }
+            }
+        }
+        // When tab becomes visible, we don't do anything to avoid unwanted navigation
+    }
+
+    /**
+     * Handle page visibility changes for loading state management
+     * Fixes stuck loading popup after tab switching
+     */
+    handlePageVisibilityChange() {
+        console.log('Page visibility changed:', document.visibilityState);
+        
+        if (document.visibilityState === 'hidden') {
+            // Mark that tab switching is happening
+            this.isTabSwitching = true;
+            this.wasLoadingBeforeHidden = this.ui && this.ui.isLoading;
+            console.log('Tab hidden, was loading:', this.wasLoadingBeforeHidden);
+            
+            // Store current pending operations count
+            this.pendingOpsBeforeHidden = this.pendingOperations.size;
+        } else if (document.visibilityState === 'visible') {
+            // Tab became visible again
+            console.log('Tab visible again, checking loading state...');
+            console.log('Pending operations:', this.pendingOperations.size);
+            console.log('Loading state:', this.ui?.isLoading);
+            
+            // Immediate check for stuck loading
+            if (this.ui && this.ui.isLoading) {
+                // If we had operations before hiding but they're gone now, they likely completed while hidden
+                if (this.pendingOpsBeforeHidden > 0 && this.pendingOperations.size === 0) {
+                    console.log('Operations completed while tab was hidden - force hiding loading');
+                    this.ui.hideLoading();
+                } else if (this.pendingOperations.size === 0) {
+                    // No operations but loading is stuck
+                    console.log('No operations but loading is stuck - force hiding loading');
+                    this.ui.hideLoading();
+                }
+            }
+            
+            // Secondary check after a short delay
+            setTimeout(() => {
+                if (this.ui && this.ui.isLoading && this.pendingOperations.size === 0) {
+                    console.log('Secondary check: Loading still stuck - force hiding');
+                    this.ui.hideLoading();
+                }
+                
+                this.isTabSwitching = false;
+                this.wasLoadingBeforeHidden = false;
+                this.pendingOpsBeforeHidden = 0;
+            }, 500);
+            
+            console.log('Page visibility handling completed');
+        }
+    }
+
+    /**
      * Handle authentication state changes
      * @param {string} event - Auth event
      * @param {Object} session - Session object
      */
     async handleAuthStateChange(event, session) {
+        console.log('Main app handling auth state change:', event, session ? 'with session' : 'no session');
+        
         try {
             if (event === 'SIGNED_IN' && session) {
+                console.log('Processing SIGNED_IN in main app');
                 this.currentUser = session.user;
                 
                 // Load user profile
+                console.log('Loading user profile...');
                 await this.loadUserProfile();
+                console.log('User profile loaded:', this.userProfile);
                 
                 // Update UI
+                console.log('Updating UI with user info...');
                 this.ui.updateUserInfo(this.currentUser, this.userProfile);
+                
+                console.log('Showing app container...');
                 this.ui.showApp();
                 
+                // Add small delay to ensure DOM is fully rendered
+                setTimeout(() => {
+                    console.log('Setting up button handlers...');
+                    this.setupButtonHandlers();
+                }, 100);
+                
                 // Load initial data
+                console.log('Loading initial data...');
                 await this.loadInitialData();
+                console.log('Initial data loaded');
                 
-                // Restore last visited page or default to clients view
-                const lastView = localStorage.getItem('lastView');
-                const lastClient = localStorage.getItem('lastClient');
-                const lastApplication = localStorage.getItem('lastApplication');
-                
-                if (lastView === 'applications' && lastClient) {
-                    try {
-                        const client = JSON.parse(lastClient);
-                        this.ui.navigateToApplications(client);
-                        await this.loadApplications(client);
-                    } catch (e) {
-                        console.warn('Failed to restore applications view:', e);
-                        this.ui.showClientsView();
-                    }
-                } else if (lastView === 'credentials' && lastApplication) {
-                    try {
-                        const application = JSON.parse(lastApplication);
-                        const client = lastClient ? JSON.parse(lastClient) : null;
-                        if (client) {
-                            this.ui.currentClient = client;
-                            this.ui.navigateToCredentials(application);
-                            await this.loadCredentials(application);
-                        } else {
+                // Only restore last visited page on initial login, not on every auth state change
+                if (this.isInitialLogin) {
+                    console.log('This is initial login, restoring last view...');
+                    const lastView = localStorage.getItem('lastView');
+                    const lastClient = localStorage.getItem('lastClient');
+                    const lastApplication = localStorage.getItem('lastApplication');
+                    
+                    if (lastView === 'applications' && lastClient) {
+                        try {
+                            const client = JSON.parse(lastClient);
+                            this.ui.navigateToApplications(client);
+                            await this.loadApplications(client);
+                        } catch (e) {
+                            console.warn('Failed to restore applications view:', e);
                             this.ui.showClientsView();
                         }
-                    } catch (e) {
-                        console.warn('Failed to restore credentials view:', e);
+                    } else if (lastView === 'credentials' && lastApplication) {
+                        try {
+                            const application = JSON.parse(lastApplication);
+                            const client = lastClient ? JSON.parse(lastClient) : null;
+                            if (client) {
+                                this.ui.currentClient = client;
+                                this.ui.navigateToCredentials(application);
+                                await this.loadCredentials(application);
+                            } else {
+                                this.ui.showClientsView();
+                            }
+                        } catch (e) {
+                            console.warn('Failed to restore credentials view:', e);
+                            this.ui.showClientsView();
+                        }
+                    } else {
+                        console.log('Showing clients view as default');
                         this.ui.showClientsView();
                     }
+                    
+                    // Reset flag after initial login
+                    this.isInitialLogin = false;
+                    
+                    // Show welcome message only on initial login
+                    this.ui.showToast('Welcome to LaliLink!', 'success');
                 } else {
-                    this.ui.showClientsView();
+                    // For subsequent auth state changes, don't navigate - keep current view
+                    console.log('Auth state changed but not navigating to avoid unwanted redirects');
                 }
                 
-                this.ui.showToast('Welcome to LaliLink!', 'success');
+                console.log('SIGNED_IN processing completed');
             } else if (event === 'SIGNED_OUT') {
+                console.log('Processing SIGNED_OUT in main app');
                 this.currentUser = null;
                 this.userProfile = null;
                 this.userPermissions = null;
                 
                 // Clear sensitive data
-                this.database.clearAllCaches();
+                if (this.database) {
+                    this.database.clearAllCaches();
+                }
                 
                 this.ui.showAuth();
                 this.ui.showToast('You have been logged out', 'info');
@@ -302,30 +520,65 @@ class LaliLinkApp {
     async handleLogin(e) {
         e.preventDefault();
         
+        // Prevent double submission
+        if (this.isSubmitting) {
+            return;
+        }
+        
+        this.isSubmitting = true;
+        
         const form = e.target;
-        const email = form.querySelector('#loginEmail').value;
-        const password = form.querySelector('#loginPassword').value;
+        const email = form.querySelector('#loginEmail')?.value?.trim();
+        const password = form.querySelector('#loginPassword')?.value;
+        
+        console.log('Login form submitted with email:', email);
         
         if (!email || !password) {
-            this.ui.showToast('Please fill in all fields', 'error');
+            this.ui.showToast('Mohon isi email dan password', 'error');
+            this.isSubmitting = false;
+            return;
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            this.ui.showToast('Format email tidak valid', 'error');
+            this.isSubmitting = false;
             return;
         }
         
         this.ui.showLoading('Signing in...');
         
         try {
-            const { data, error } = await this.auth.signIn(email, password);
+            this.isInitialLogin = true;
+            console.log('Calling auth.signIn...');
             
-            if (error) {
-                throw error;
+            const result = await this.auth.signIn(email, password);
+            console.log('Auth result:', result);
+            
+            if (result.error) {
+                console.error('Login failed with error:', result.error);
+                throw new Error(result.error.message || 'Login failed');
             }
             
+            console.log('Login successful, waiting for auth state change...');
             // Success is handled by auth state change
+            
         } catch (error) {
             console.error('Login error:', error);
-            this.ui.showToast(error.message || 'Login failed', 'error');
+            
+            // Extract meaningful error message
+            let errorMessage = 'Login gagal';
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.error_description) {
+                errorMessage = error.error_description;
+            }
+            
+            this.ui.showToast(errorMessage, 'error');
         } finally {
             this.ui.hideLoading();
+            this.isSubmitting = false;
         }
     }
 
@@ -383,6 +636,7 @@ class LaliLinkApp {
      */
     async handleLogout() {
         try {
+            console.log('Logout button clicked');
             this.ui.showLoading('Signing out...');
             
             // Clear navigation state before logout
@@ -390,11 +644,20 @@ class LaliLinkApp {
             localStorage.removeItem('lastClient');
             localStorage.removeItem('lastApplication');
             
-            await this.auth.signOut();
+            console.log('Calling auth.signOut...');
+            const result = await this.auth.signOut();
+            
+            if (result.error) {
+                console.error('Logout failed with error:', result.error);
+                throw new Error(result.error.message || 'Logout failed');
+            }
+            
+            console.log('Logout successful');
             // Success is handled by auth state change
+            
         } catch (error) {
             console.error('Logout error:', error);
-            this.ui.showToast('Logout failed', 'error');
+            this.ui.showToast(error.message || 'Logout gagal', 'error');
         } finally {
             this.ui.hideLoading();
         }
@@ -442,7 +705,7 @@ class LaliLinkApp {
             // Load permissions
             this.userPermissions = this.auth.getUserPermissions();
             
-            // Update role-based UI
+            // Update role-based UI immediately
             this.ui.updateRoleBasedUI(this.userProfile.role, this.userPermissions);
             
         } catch (error) {
@@ -472,6 +735,40 @@ class LaliLinkApp {
     startSessionMonitoring() {
         // Check session every 5 minutes
         this.sessionCheckInterval = setInterval(this.checkSession, 5 * 60 * 1000);
+    }
+
+    /**
+     * Start simple loading state monitoring
+     */
+    startLoadingStateMonitoring() {
+        // Check loading state every 3 seconds for less aggressive monitoring
+        this.loadingStateChecker = setInterval(() => {
+            if (this.ui && this.ui.isLoading) {
+                const currentTime = Date.now();
+                
+                // If loading started time is not set, set it now
+                if (!this.loadingStartTime) {
+                    this.loadingStartTime = currentTime;
+                    console.log('Loading state monitoring: Loading started at', new Date(this.loadingStartTime));
+                    return;
+                }
+                
+                // Check if loading has been active for too long
+                const loadingDuration = currentTime - this.loadingStartTime;
+                
+                // Only intervene if no pending operations and loading is genuinely stuck
+                if (loadingDuration > this.maxLoadingDuration && this.pendingOperations.size === 0) {
+                    console.warn('Loading state stuck for', loadingDuration, 'ms with no pending operations - hiding loading');
+                    this.ui.hideLoading(); // Use simple hide
+                    this.loadingStartTime = null;
+                }
+            } else {
+                // Reset loading start time when not loading
+                this.loadingStartTime = null;
+            }
+        }, 3000); // Less frequent checks to be less aggressive
+        
+        console.log('Simple loading state monitoring started');
     }
 
     /**
@@ -531,6 +828,9 @@ class LaliLinkApp {
      * Load clients
      */
     async loadClients() {
+        const operationId = 'loadClients_' + Date.now();
+        this.pendingOperations.add(operationId);
+        
         try {
             this.ui.showLoading('Loading clients...');
             
@@ -548,7 +848,11 @@ class LaliLinkApp {
             console.error('Failed to load clients:', error);
             this.ui.showToast('Failed to load clients', 'error');
         } finally {
-            this.ui.hideLoading();
+            this.pendingOperations.delete(operationId);
+            // Ensure loading is hidden even if tab was switched
+            if (this.ui) {
+                this.ui.hideLoading();
+            }
         }
     }
 
@@ -557,6 +861,9 @@ class LaliLinkApp {
      * @param {Object} client - Client object
      */
     async loadApplications(client) {
+        const operationId = 'loadApplications_' + Date.now();
+        this.pendingOperations.add(operationId);
+        
         try {
             this.ui.showLoading('Loading applications...');
             
@@ -574,7 +881,11 @@ class LaliLinkApp {
             console.error('Failed to load applications:', error);
             this.ui.showToast('Failed to load applications', 'error');
         } finally {
-            this.ui.hideLoading();
+            this.pendingOperations.delete(operationId);
+            // Ensure loading is hidden even if tab was switched
+            if (this.ui) {
+                this.ui.hideLoading();
+            }
         }
     }
 
@@ -583,6 +894,9 @@ class LaliLinkApp {
      * @param {Object} application - Application object
      */
     async loadCredentials(application) {
+        const operationId = 'loadCredentials_' + Date.now();
+        this.pendingOperations.add(operationId);
+        
         try {
             this.ui.showLoading('Loading credentials...');
             
@@ -600,7 +914,11 @@ class LaliLinkApp {
             console.error('Failed to load credentials:', error);
             this.ui.showToast('Failed to load credentials', 'error');
         } finally {
-            this.ui.hideLoading();
+            this.pendingOperations.delete(operationId);
+            // Ensure loading is hidden even if tab was switched
+            if (this.ui) {
+                this.ui.hideLoading();
+            }
         }
     }
 
@@ -799,7 +1117,28 @@ class LaliLinkApp {
     async handleClientSubmit(e) {
         e.preventDefault();
         
+        console.log('Client form submitted, checking for double submission...');
+        
+        // Prevent double submission with debounce
+        const currentTime = Date.now();
+        if (this.isSubmitting || (currentTime - this.lastSubmissionTime) < this.submissionDebounceMs) {
+            console.log('Double submission prevented');
+            return;
+        }
+        
+        console.log('Processing client form submission...');
+        this.isSubmitting = true;
+        this.lastSubmissionTime = currentTime;
+        
         const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        // Disable submit button immediately
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+        }
+        
         const clientData = {
             client_name: form.querySelector('#clientName').value,
             company_name: form.querySelector('#companyName').value,
@@ -809,13 +1148,17 @@ class LaliLinkApp {
         const mode = e.target.dataset.mode;
         const clientId = e.target.dataset.clientId;
         
+        console.log('Client data:', clientData, 'Mode:', mode);
+        
         try {
             this.ui.showLoading(mode === 'create' ? 'Creating client...' : 'Updating client...');
             
             let result;
             if (mode === 'create') {
+                console.log('Creating new client...');
                 result = await this.database.createClient(clientData);
             } else {
+                console.log('Updating existing client...');
                 result = await this.database.updateClient(parseInt(clientId), clientData);
             }
             
@@ -823,6 +1166,7 @@ class LaliLinkApp {
                 throw result.error;
             }
             
+            console.log('Client saved successfully');
             this.ui.showToast(
                 mode === 'create' ? 'Client created successfully' : 'Client updated successfully',
                 'success'
@@ -836,6 +1180,15 @@ class LaliLinkApp {
             this.ui.showToast('Failed to save client', 'error');
         } finally {
             this.ui.hideLoading();
+            this.isSubmitting = false;
+            
+            // Re-enable submit button
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save';
+            }
+            
+            console.log('Client form submission completed');
         }
     }
 
@@ -846,7 +1199,23 @@ class LaliLinkApp {
     async handleApplicationSubmit(e) {
         e.preventDefault();
         
+        // Prevent double submission with debounce
+        const currentTime = Date.now();
+        if (this.isSubmitting || (currentTime - this.lastSubmissionTime) < this.submissionDebounceMs) {
+            return;
+        }
+        
+        this.isSubmitting = true;
+        this.lastSubmissionTime = currentTime;
+        
         const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        // Disable submit button
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        
         const appData = {
             client_id: this.ui.currentClient.id,
             app_name: form.querySelector('#applicationName').value,
@@ -885,6 +1254,13 @@ class LaliLinkApp {
             this.ui.showToast('Failed to save application', 'error');
         } finally {
             this.ui.hideLoading();
+            this.isSubmitting = false;
+            
+            // Re-enable submit button
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
         }
     }
 
@@ -895,7 +1271,23 @@ class LaliLinkApp {
     async handleCredentialSubmit(e) {
         e.preventDefault();
         
+        // Prevent double submission with debounce
+        const currentTime = Date.now();
+        if (this.isSubmitting || (currentTime - this.lastSubmissionTime) < this.submissionDebounceMs) {
+            return;
+        }
+        
+        this.isSubmitting = true;
+        this.lastSubmissionTime = currentTime;
+        
         const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        // Disable submit button
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        
         const credentialName = form.querySelector('#credentialName')?.value?.trim();
         const username = form.querySelector('#credentialUsername')?.value?.trim();
         const password = form.querySelector('#credentialPassword')?.value;
@@ -906,6 +1298,10 @@ class LaliLinkApp {
         
         if (!credentialName || !username || !password || !role) {
             this.ui.showToast('Please fill in all required fields', 'error');
+            this.isSubmitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
             return;
         }
         
@@ -980,6 +1376,13 @@ class LaliLinkApp {
             this.ui.showToast(errorMessage, 'error');
         } finally {
             this.ui.hideLoading();
+            this.isSubmitting = false;
+            
+            // Re-enable submit button
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
         }
     }
 
@@ -1408,6 +1811,15 @@ class LaliLinkApp {
             clearInterval(this.sessionCheckInterval);
         }
         
+        // Clear loading state monitoring
+        if (this.loadingStateChecker) {
+            clearInterval(this.loadingStateChecker);
+        }
+        
+        // Remove event listeners
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        document.removeEventListener('visibilitychange', this.pageVisibilityHandler);
+        
         // Clear caches
         if (this.database) {
             this.database.clearAllCaches();
@@ -1417,6 +1829,10 @@ class LaliLinkApp {
         this.currentUser = null;
         this.userProfile = null;
         this.userPermissions = null;
+        
+        // Reset loading state
+        this.wasLoadingBeforeHidden = false;
+        this.loadingStartTime = null;
         
         console.log('LaliLink app destroyed');
     }

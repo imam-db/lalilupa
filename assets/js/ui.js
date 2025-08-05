@@ -72,6 +72,25 @@ class UIManager {
         
         // Navigation tabs
         this.navTabs = document.querySelectorAll('[data-tab]');
+        
+        // Add click handler to loading overlay for emergency hide
+        this.setupLoadingOverlayClickHandler();
+    }
+    
+    /**
+     * Setup loading overlay click handler for emergency hide
+     */
+    setupLoadingOverlayClickHandler() {
+        if (this.loadingOverlay) {
+            // Allow user to click on loading overlay to force hide after 3 seconds
+            this.loadingOverlay.addEventListener('click', (e) => {
+                if (this.isLoading && this.loadingOverlay.dataset.clickable === 'true') {
+                    console.log('Loading overlay clicked - force hiding');
+                    this.hideLoading();
+                    this.showToast('Loading cancelled', 'info', 2000);
+                }
+            });
+        }
     }
 
     /**
@@ -148,13 +167,39 @@ class UIManager {
      * @param {string} message - Loading message
      */
     showLoading(message = 'Loading...') {
+        console.log('showLoading called:', message);
         this.isLoading = true;
+        
+        // Notify main app about loading start
+        if (window.laliApp) {
+            window.laliApp.loadingStartTime = Date.now();
+        }
+        
         if (this.loadingOverlay) {
             const loadingText = this.loadingOverlay.querySelector('.loading-text');
             if (loadingText) {
                 loadingText.textContent = message;
             }
-            this.loadingOverlay.classList.remove('hidden');
+            
+            // Simple and reliable show
+            this.loadingOverlay.classList.remove('hidden', 'fade-out');
+            
+            // Make overlay clickable after 3 seconds as emergency escape
+            this.loadingOverlay.dataset.clickable = 'false';
+            setTimeout(() => {
+                if (this.isLoading && this.loadingOverlay) {
+                    this.loadingOverlay.dataset.clickable = 'true';
+                    this.loadingOverlay.style.cursor = 'pointer';
+                    
+                    // Update loading text to show it's clickable
+                    const loadingText = this.loadingOverlay.querySelector('.loading-text');
+                    if (loadingText && !loadingText.textContent.includes('(Click to cancel)')) {
+                        loadingText.textContent += ' (Click to cancel)';
+                    }
+                }
+            }, 3000);
+            
+            console.log('Loading overlay shown');
         } else {
             console.warn('Loading overlay element not found');
         }
@@ -164,13 +209,26 @@ class UIManager {
      * Hide loading overlay
      */
     hideLoading() {
+        console.log('hideLoading called');
         this.isLoading = false;
+        
+        // Reset loading start time in main app
+        if (window.laliApp) {
+            window.laliApp.loadingStartTime = null;
+        }
+        
         if (this.loadingOverlay) {
+            // Simple and reliable hide - immediately add hidden class
             this.loadingOverlay.classList.add('hidden');
+            this.loadingOverlay.classList.remove('fade-out');
+            this.loadingOverlay.dataset.clickable = 'false';
+            this.loadingOverlay.style.cursor = 'default';
+            console.log('Loading overlay hidden');
         } else {
             console.warn('Loading overlay element not found');
         }
     }
+
 
     /**
      * Show authentication container

@@ -80,6 +80,45 @@
         .btn-danger:hover {
             background-color: #DC2626;
         }
+        
+        /* Simple and reliable loading overlay styles */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s ease;
+        }
+        
+        #loadingOverlay.hidden {
+            display: none !important;
+        }
+        
+        /* Clickable state for emergency hide */
+        #loadingOverlay[data-clickable="true"] {
+            cursor: pointer;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        
+        #loadingOverlay[data-clickable="true"]:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        
+        /* Loading spinner animation */
+        #loadingOverlay .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
